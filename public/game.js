@@ -30,6 +30,28 @@ let particles = [];
 // Local player movement
 const keys = {};
 let nearbyTarget = null;
+let targetMovePos = null; // for tap-to-move on mobile/mouse
+
+// Fullscreen toggle
+document.getElementById('btn-fullscreen').addEventListener('click', () => {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen().catch(err => console.log(err));
+  } else {
+    document.exitFullscreen().catch(err => console.log(err));
+  }
+});
+
+// Canvas Click / Tap to Move
+canvas.addEventListener('pointerdown', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  const clickX = (e.clientX - rect.left) * scaleX;
+  const clickY = (e.clientY - rect.top) * scaleY;
+
+  // Set destination
+  targetMovePos = { x: clickX, y: clickY };
+});
 
 // Fireflies for evening / night
 for (let i = 0; i < 30; i++) {
@@ -640,10 +662,28 @@ function update(dt) {
     let dy = 0;
     const speed = 2.8;
 
-    if (keys['w'] || keys['arrowup']) { dy -= 1; p.dir = 'up'; }
-    if (keys['s'] || keys['arrowdown']) { dy += 1; p.dir = 'down'; }
-    if (keys['a'] || keys['arrowleft']) { dx -= 1; p.dir = 'left'; }
-    if (keys['d'] || keys['arrowright']) { dx += 1; p.dir = 'right'; }
+    if (keys['w'] || keys['arrowup']) { dy -= 1; p.dir = 'up'; targetMovePos = null; }
+    if (keys['s'] || keys['arrowdown']) { dy += 1; p.dir = 'down'; targetMovePos = null; }
+    if (keys['a'] || keys['arrowleft']) { dx -= 1; p.dir = 'left'; targetMovePos = null; }
+    if (keys['d'] || keys['arrowright']) { dx += 1; p.dir = 'right'; targetMovePos = null; }
+
+    // Tap-to-move interpolation
+    if (targetMovePos && dx === 0 && dy === 0) {
+      const dist = Math.hypot(targetMovePos.x - p.x, targetMovePos.y - p.y);
+      if (dist > 8) {
+        dx = (targetMovePos.x - p.x) / dist;
+        dy = (targetMovePos.y - p.y) / dist;
+        if (Math.abs(dx) > Math.abs(dy)) {
+          p.dir = dx > 0 ? 'right' : 'left';
+        } else {
+          p.dir = dy > 0 ? 'down' : 'up';
+        }
+      } else {
+        targetMovePos = null;
+        // If near target upon arrival, automatically trigger interaction
+        if (nearbyTarget) handleInteraction();
+      }
+    }
 
     if (dx !== 0 && dy !== 0) {
       dx *= 0.7071;

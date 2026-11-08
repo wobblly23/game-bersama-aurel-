@@ -13,6 +13,11 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Health check / ping endpoint
+app.get('/ping', (req, res) => {
+  res.send('pong ❤️');
+});
+
 // In-memory room storage
 const rooms = new Map();
 
