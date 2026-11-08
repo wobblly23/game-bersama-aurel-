@@ -15,44 +15,99 @@ let roomCode = 'AUREL-KITA';
 let activeTool = 'hoe'; // 'hoe' | 'watering_can' | 'fishing_rod' | 'basket' | 'rose'
 let toolSwingAnim = 0; // tool use animation timer
 
-// Solid World Collision Boxes (Players cannot walk through walls/furniture/deep water)
+// ================= MASSIVE EXPANDED WORLD & CAMERA =================
+const worldWidth = 2400;
+const worldHeight = 1600;
+const camera = { x: 0, y: 0 };
+
+// Preload Kenney Visual Assets
+const assetImgs = {};
+function getAsset(name, src) {
+  if (!assetImgs[name]) {
+    const img = new Image();
+    img.src = src;
+    assetImgs[name] = img;
+  }
+  return assetImgs[name];
+}
+
+// Preload core assets
+getAsset('bldg_a', 'assets/city_building-a.png');
+getAsset('bldg_b', 'assets/city_building-b.png');
+getAsset('bldg_c', 'assets/city_building-c.png');
+getAsset('bldg_d', 'assets/city_building-d.png');
+getAsset('cash_reg', 'assets/shop_cash-register.png');
+getAsset('disp_fruit', 'assets/shop_display-fruit.png');
+getAsset('disp_bread', 'assets/shop_display-bread.png');
+getAsset('clothing_rack', 'assets/shop_clothing-rack.png');
+getAsset('employee', 'assets/shop_character-employee.png');
+getAsset('bridge', 'assets/forest_bridge.png');
+
+// Solid World Collision Boxes across 2400x1600
 const solidColliders = [
-  // House North Wall
+  // 1. Home North, West, East, South Walls
   { x1: 275, y1: 70, x2: 595, y2: 106 },
-  // House West Wall
   { x1: 275, y1: 70, x2: 298, y2: 290 },
-  // House East Wall
   { x1: 572, y1: 70, x2: 595, y2: 290 },
-  // House South Wall Left of door
   { x1: 275, y1: 272, x2: 412, y2: 292 },
-  // House South Wall Right of door
   { x1: 458, y1: 272, x2: 595, y2: 292 },
-  // Furniture inside house
+  // Home Furniture
   { x1: 375, y1: 108, x2: 450, y2: 155, tag: 'bed' },
   { x1: 472, y1: 108, x2: 518, y2: 152 }, // stove
   { x1: 522, y1: 106, x2: 562, y2: 152 }, // fridge
-  { x1: 318, y1: 182, x2: 368, y2: 218 }, // dining table
-  // Shop building
+  { x1: 318, y1: 182, x2: 368, y2: 218 }, // table
+  // Pak Joko Shop
   { x1: 722, y1: 65, x2: 825, y2: 128 },
-  // Cafe Stand
+  // Home Cafe Stand
   { x1: 618, y1: 318, x2: 692, y2: 366 },
-  // Tree trunks
+  // 2. City Buildings in Downtown Plaza
+  { x1: 820, y1: 910, x2: 950, y2: 1050 }, // City Hall
+  { x1: 1020, y1: 910, x2: 1150, y2: 1050 }, // Bakery
+  { x1: 1320, y1: 910, x2: 1450, y2: 1050 }, // Boutique
+  { x1: 1520, y1: 910, x2: 1650, y2: 1050 }, // Bank
+  // 3. Downtown Fountain
+  { x1: 1175, y1: 1215, x2: 1225, y2: 1265, tag: 'fountain' },
+  // 4. Forest Rocks & Trees
   { x1: 70, y1: 195, x2: 90, y2: 228 },
   { x1: 110, y1: 595, x2: 130, y2: 628 },
   { x1: 210, y1: 645, x2: 230, y2: 678 },
-  { x1: 870, y1: 255, x2: 890, y2: 288 }
+  { x1: 870, y1: 255, x2: 890, y2: 288 },
+  { x1: 1820, y1: 220, x2: 1860, y2: 270 },
+  { x1: 2150, y1: 220, x2: 2250, y2: 280 }
 ];
 
 function isSolid(x, y, isSleeping = false) {
-  // Map boundaries
-  if (x < 30 || x > 930 || y < 40 || y > 690) return true;
+  // 2400 x 1600 World bounds
+  if (x < 30 || x > 2370 || y < 40 || y > 1570) return true;
 
-  // Deep Lake collision (dock at x: 710..760, y: 600..640 is walkable)
-  const inDock = (x >= 710 && x <= 762 && y >= 600 && y <= 640);
-  if (!inDock) {
-    const pondDx = (x - 810) / 72;
-    const pondDy = (y - 620) / 42;
-    if (pondDx * pondDx + pondDy * pondDy < 1) return true;
+  // Deep Lake collision in Forest (dock at x: 1820..1910, y: 460..510 is walkable!)
+  const inForestDock = (x >= 1810 && x <= 1915 && y >= 455 && y <= 515);
+  if (!inForestDock) {
+    const pDx = (x - 2000) / 180;
+    const pDy = (y - 480) / 110;
+    if (pDx * pDx + pDy * pDy < 1) return true;
+  }
+
+  // Business Store Walls (if built at x: 1020..1300, y: 240..420)
+  // Has door opening at x: 1130..1190, y: 400..425
+  if (sharedState && sharedState.store && sharedState.store.owned) {
+    if (x >= 1020 && x <= 1300 && y >= 240 && y <= 420) {
+      const isDoor = (x >= 1130 && x <= 1190 && y >= 390 && y <= 430);
+      if (!isDoor) {
+        // North wall
+        if (y <= 270) return true;
+        // West wall
+        if (x <= 1040) return true;
+        // East wall
+        if (x >= 1280) return true;
+        // South wall left
+        if (x < 1130 && y >= 395) return true;
+        // South wall right
+        if (x > 1190 && y >= 395) return true;
+        // Counter & Cash register collision inside
+        if (x >= 1120 && x <= 1200 && y >= 310 && y <= 350) return true;
+      }
+    }
   }
 
   // Box colliders
@@ -65,7 +120,7 @@ function isSolid(x, y, isSleeping = false) {
   return false;
 }
 
-// Living Animated NPCs & Pets
+// Living Animated NPCs & Citizens across the Town
 const npcs = [
   {
     id: 'joko',
@@ -78,7 +133,7 @@ const npcs = [
     dir: 'down', anim: 'idle',
     wanderTimer: 0,
     dialogues: [
-      "Halo anak muda! Senang melihat kalian berdua rukun merawat kebun ini.",
+      "Halo Zahy & Aurel! Senang melihat kalian berdua rukun merawat kebun ini.",
       "Tanaman stroberi butuh disiram air dengan penuh cinta agar cepat berbuah lebat lho!",
       "Jika hasil panen kalian melimpah, jual saja padaku, akan kubeli dengan harga terbaik!"
     ],
@@ -97,7 +152,7 @@ const npcs = [
     dialogues: [
       "Wah, pasangan serasi sekali kalian berdua! Rumah kalian kelihatan semakin asri dan nyaman.",
       "Tahukah kamu? Ikan bakar dan salad segar buatan tangan sendiri rasanya seribu kali lebih enak kalau dimakan berdua!",
-      "Stan kedai kafe kalian laris manis lho! Warga desa suka sekali mampir beli kue kalian."
+      "Kalian sudah lihat kavling tanah di sebelah timur? Cocok sekali untuk kalian bangun toko impian berdua!"
     ],
     actionType: 'recipe_talk'
   },
@@ -114,7 +169,7 @@ const npcs = [
     dialogues: [
       "Cinta sejati itu seperti menanam pohon. Harus disiram setiap hari dengan kesabaran, pengertian, dan senyuman.",
       "Saling menjaga ya kalian berdua. Kakek doakan hubungan kalian langgeng sampai kakek-nenek!",
-      "Kakek dulu sering memancing di danau ini bersama almarhumah nenek. Tempat ini penuh kenangan indah."
+      "Di pusat kota ada Air Mancur Harapan. Konon siapa yang melempar koin berdua, cintanya abadi."
     ],
     actionType: 'blessing'
   },
@@ -130,16 +185,67 @@ const npcs = [
     wanderTimer: 0
   },
   {
-    id: 'budi',
-    name: 'Budi (Warga Desa)',
-    role: 'Pelanggan Kedai',
+    id: 'mandor',
+    name: 'Pak RT / Mandor',
+    role: 'Pengelola Kavling Bisnis',
+    avatar: '👷‍♂️',
+    color: '#d69e2e',
+    x: 1040, y: 380,
+    targetX: 1040, targetY: 380,
+    dir: 'down', anim: 'idle',
+    wanderTimer: 0,
+    dialogues: [
+      "Halo pasangan muda! Kavling tanah bisnis seluas 400m² ini siap kalian beli seharga 120 koin.",
+      "Jika sudah kalian beli, kalian bisa membangun toko besar dan menyewa karyawan bot untuk jualan!",
+      "Bisnis berdua adalah kunci masa depan yang cerah dan mandiri!"
+    ],
+    actionType: 'property'
+  },
+  // City Citizens walking in Town Center
+  {
+    id: 'andi',
+    name: 'Andi (Warga Kota)',
+    role: 'Pecinta Kopi & Belanja',
     avatar: '🧑',
     color: '#319795',
-    x: 880, y: 345,
-    targetX: 670, targetY: 345,
-    dir: 'left', anim: 'walk',
+    x: 1100, y: 1100,
+    targetX: 1100, targetY: 1100,
+    dir: 'down', anim: 'walk',
     wanderTimer: 0,
-    isCustomer: true
+    dialogues: [
+      "Pusat kota hari ini ramai sekali ya! Senang rasanya jalan-jalan di alun-alun.",
+      "Saya sedang mencari toko baru yang menjual makanan segar buatan lokal."
+    ]
+  },
+  {
+    id: 'rina',
+    name: 'Rina (Warga Kota)',
+    role: 'Penggemar Bunga & Fashion',
+    avatar: '👩',
+    color: '#9f7aea',
+    x: 1350, y: 1200,
+    targetX: 1350, targetY: 1200,
+    dir: 'down', anim: 'walk',
+    wanderTimer: 0,
+    dialogues: [
+      "Air mancur di tengah alun-alun kota ini sangat romantis di malam hari!",
+      "Kalian pasangan pengantin baru ya? Semoga selalu bahagia ya!"
+    ]
+  },
+  {
+    id: 'bayu',
+    name: 'Bayu (Petualang)',
+    role: 'Pecinta Alam & Danau',
+    avatar: '🧗‍♂️',
+    color: '#38a169',
+    x: 1850, y: 460,
+    targetX: 1850, targetY: 460,
+    dir: 'down', anim: 'walk',
+    wanderTimer: 0,
+    dialogues: [
+      "Danau di hutan mini ini airnya jernih sekali! Ikan mas dan mujair banyak berenang di sini.",
+      "Di sebelah timur ada tenda kemping dan api unggun, cocok sekali untuk duduk berdua saat malam hari!"
+    ]
   }
 ];
 
@@ -150,6 +256,7 @@ let sharedState = {
   fridge: [],
   loveNotes: [],
   cafeStand: { stockedItems: [], totalSold: 0 },
+  store: { owned: false, level: 1, hiredEmployees: [], stockedItems: [], dailyRevenue: 0, visitorCount: 0 },
   timeOfDay: 7.0,
   dayCount: 1
 };
@@ -252,23 +359,23 @@ document.getElementById('btn-fullscreen').addEventListener('click', () => {
   }
 });
 
-// Canvas Click / Tap to Move
+// Canvas Click / Tap to Move (World Coordinate with Camera)
 canvas.addEventListener('pointerdown', (e) => {
   const rect = canvas.getBoundingClientRect();
   const scaleX = canvas.width / rect.width;
   const scaleY = canvas.height / rect.height;
-  const clickX = (e.clientX - rect.left) * scaleX;
-  const clickY = (e.clientY - rect.top) * scaleY;
+  const clickX = (e.clientX - rect.left) * scaleX + camera.x;
+  const clickY = (e.clientY - rect.top) * scaleY + camera.y;
 
-  // Set destination
+  // Set destination in world coordinates
   targetMovePos = { x: clickX, y: clickY };
 });
 
-// Fireflies for evening / night
-for (let i = 0; i < 30; i++) {
+// Fireflies for evening / night across 2400 x 1600
+for (let i = 0; i < 60; i++) {
   particles.push({
-    x: Math.random() * 960,
-    y: Math.random() * 720,
+    x: Math.random() * worldWidth,
+    y: Math.random() * worldHeight,
     vx: (Math.random() - 0.5) * 0.4,
     vy: (Math.random() - 0.5) * 0.4,
     radius: 1.5 + Math.random() * 2,
@@ -379,11 +486,16 @@ socket.on('init_room_state', (data) => {
   sharedState = data.sharedState;
   farmingPlots = data.farmingPlots;
 
+  if (!sharedState.store) {
+    sharedState.store = { owned: false, level: 1, hiredEmployees: [], stockedItems: [], dailyRevenue: 0, visitorCount: 0 };
+  }
+
   updateHUD();
   updateFridgeUI();
   updateLoveNotesUI();
   updateShopSellUI();
   updateCafeUI();
+  updateStoreUI();
 
   // Render chat messages
   if (data.chatMessages) {
@@ -546,6 +658,52 @@ socket.on('cafe_updated', (data) => {
   sharedState.fridge = data.fridge;
   updateCafeUI();
   updateFridgeUI();
+});
+
+// Store & Business Events
+socket.on('land_bought', (data) => {
+  sharedState.store = data.store;
+  sharedState.coins = data.coins;
+  sharedState.lovePoints = data.lovePoints;
+  window.soundManager?.playLove();
+  addFloatingText(1160, 260, data.message, '#ff6584');
+  updateHUD();
+  updateStoreUI();
+});
+
+socket.on('employee_hired', (data) => {
+  sharedState.store = data.store;
+  sharedState.coins = data.coins;
+  sharedState.lovePoints = data.lovePoints;
+  window.soundManager?.playCoin();
+  addFloatingText(1160, 260, data.message, '#38a169');
+  updateHUD();
+  updateStoreUI();
+});
+
+socket.on('store_stocked', (data) => {
+  sharedState.store = data.store;
+  sharedState.fridge = data.fridge;
+  updateStoreUI();
+  updateFridgeUI();
+});
+
+socket.on('store_sale', (data) => {
+  sharedState.coins = data.coins;
+  sharedState.lovePoints = data.lovePoints;
+  sharedState.store = data.store;
+  window.soundManager?.playCoin();
+  addFloatingText(1160, 260, `🏪 Toko laku! 1x ${data.item} terjual (+🪙${data.price})`, '#38a169');
+  updateHUD();
+  updateStoreUI();
+});
+
+socket.on('fountain_wished', (data) => {
+  sharedState.coins = data.coins;
+  sharedState.lovePoints = data.lovePoints;
+  window.soundManager?.playLove();
+  addFloatingText(1200, 1200, data.message, '#ff477e');
+  updateHUD();
 });
 
 socket.on('chat_message', (msg) => {
@@ -868,6 +1026,116 @@ function escapeHtml(string) {
   });
 }
 
+// ================= STORE & BUSINESS MODALS =================
+function openBuyLandModal() {
+  const coinEl = document.getElementById('buy-land-coins');
+  if (coinEl) coinEl.innerText = sharedState.coins;
+  openModal('modal-buy-land');
+}
+window.openBuyLandModal = openBuyLandModal;
+
+function confirmBuyLand() {
+  if (sharedState.coins < 120) {
+    if (myId && players[myId]) addFloatingText(players[myId].x, players[myId].y - 30, 'Koin belum cukup (Butuh 120)! 🪙', '#e53e3e');
+    window.soundManager?.playTone(300, 'sine', 0.1, 0.2);
+    return;
+  }
+  socket.emit('buy_land');
+  closeAllModals();
+}
+window.confirmBuyLand = confirmBuyLand;
+
+function openManageStoreModal() {
+  updateStoreUI();
+  openModal('modal-manage-store');
+}
+window.openManageStoreModal = openManageStoreModal;
+
+function updateStoreUI() {
+  const store = sharedState.store || { owned: false, level: 1, hiredEmployees: [], stockedItems: [], dailyRevenue: 0, visitorCount: 0 };
+  const revEl = document.getElementById('store-daily-revenue');
+  if (revEl) revEl.innerText = store.dailyRevenue || 0;
+  const visEl = document.getElementById('store-visitor-count');
+  if (visEl) visEl.innerText = store.visitorCount || 0;
+
+  // Button Rani
+  const raniBtn = document.getElementById('btn-hire-rani');
+  if (raniBtn) {
+    if (store.hiredEmployees && store.hiredEmployees.includes('rani')) {
+      raniBtn.innerText = 'Sudah Bekerja ✅';
+      raniBtn.disabled = true;
+      raniBtn.style.background = '#a0aec0';
+    } else {
+      raniBtn.innerText = 'Sewa Rani (🪙 25)';
+      raniBtn.disabled = false;
+      raniBtn.style.background = '#4a90e2';
+    }
+  }
+
+  // Button Doni
+  const doniBtn = document.getElementById('btn-hire-doni');
+  if (doniBtn) {
+    if (store.hiredEmployees && store.hiredEmployees.includes('doni')) {
+      doniBtn.innerText = 'Sudah Bekerja ✅';
+      doniBtn.disabled = true;
+      doniBtn.style.background = '#a0aec0';
+    } else {
+      doniBtn.innerText = 'Sewa Doni (🪙 30)';
+      doniBtn.disabled = false;
+      doniBtn.style.background = '#4a90e2';
+    }
+  }
+
+  // Stock Grid
+  const stockGrid = document.getElementById('store-stock-grid');
+  if (!stockGrid) return;
+  stockGrid.innerHTML = '';
+
+  const readyItems = sharedState.fridge.filter(i => (i.id.includes('salad') || i.id.includes('grilled') || i.id.startsWith('crop_') || i.id.startsWith('fish_') || i.id.includes('bread')) && i.count > 0);
+  if (readyItems.length === 0) {
+    stockGrid.innerHTML = '<p style="font-size:12px; color:#a0aec0;">Kulkas kosong. Panen sayur atau masak makanan dulu untuk dipajang di rak toko!</p>';
+    return;
+  }
+
+  readyItems.forEach(item => {
+    const card = document.createElement('div');
+    card.className = 'item-card';
+    card.innerHTML = `
+      <span class="item-icon">${item.icon || '📦'}</span>
+      <div class="item-name">${item.name}</div>
+      <div class="item-count">Di Kulkas: ${item.count}</div>
+      <button class="btn-item-action" style="background:#38a169;" onclick="stockStoreItem('${item.id}')">Pajang di Rak 📦</button>
+    `;
+    stockGrid.appendChild(card);
+  });
+}
+window.updateStoreUI = updateStoreUI;
+
+function hireEmployee(employeeId, cost) {
+  if (sharedState.coins < cost) {
+    if (myId && players[myId]) addFloatingText(players[myId].x, players[myId].y - 30, `Koin tidak cukup (Butuh ${cost})! 🪙`, '#e53e3e');
+    window.soundManager?.playTone(300, 'sine', 0.1, 0.2);
+    return;
+  }
+  socket.emit('hire_employee', { employeeId, cost });
+}
+window.hireEmployee = hireEmployee;
+
+function stockStoreItem(itemId) {
+  socket.emit('stock_store', { itemId });
+}
+window.stockStoreItem = stockStoreItem;
+
+function makeFountainWish() {
+  if (sharedState.coins < 1) {
+    if (myId && players[myId]) addFloatingText(players[myId].x, players[myId].y - 30, 'Kamu butuh 1 koin untuk melempar harapan! 🪙', '#e53e3e');
+    return;
+  }
+  socket.emit('make_fountain_wish');
+  closeAllModals();
+}
+window.makeFountainWish = makeFountainWish;
+
 // ================= GAME LOGIC & INTERACTION =================
 function handleInteraction() {
   if (!nearbyTarget) return;
@@ -881,6 +1149,12 @@ function handleInteraction() {
     window.soundManager?.playLove();
     addFloatingText(p.x, p.y - 40, '🌹 Hadiah Mawar Merah untuk Pacar Tersayang! 💖', '#ff1493');
     socket.emit('couple_action', { actionType: 'kiss' });
+  } else if (nearbyTarget.type === 'buy_land') {
+    openBuyLandModal();
+  } else if (nearbyTarget.type === 'manage_store') {
+    openManageStoreModal();
+  } else if (nearbyTarget.type === 'fountain') {
+    openModal('modal-fountain');
   } else if (nearbyTarget.type === 'pet') {
     window.soundManager?.playMeow();
     addFloatingText(nearbyTarget.x, nearbyTarget.y - 25, 'Purrr~ Meoww! Mimi senang dielus! 🐱❤️', '#ff6584');
@@ -1001,6 +1275,12 @@ function update(dt) {
     } else {
       p.anim = 'idle';
     }
+
+    // Camera smooth follow local player across 2400 x 1600
+    const targetCamX = Math.max(0, Math.min(worldWidth - canvas.width, p.x - canvas.width / 2));
+    const targetCamY = Math.max(0, Math.min(worldHeight - canvas.height, p.y - canvas.height / 2));
+    camera.x += (targetCamX - camera.x) * 0.12;
+    camera.y += (targetCamY - camera.y) * 0.12;
   }
 
   // Update NPCs & Pets AI Loop
@@ -1057,10 +1337,10 @@ function update(dt) {
     if (ft.alpha <= 0) floatingTexts.splice(i, 1);
   }
 
-  // Update firefly particles
+  // Update firefly particles across 2400 x 1600
   particles.forEach(pt => {
-    pt.x = (pt.x + pt.vx + 960) % 960;
-    pt.y = (pt.y + pt.vy + 720) % 720;
+    pt.x = (pt.x + pt.vx + worldWidth) % worldWidth;
+    pt.y = (pt.y + pt.vy + worldHeight) % worldHeight;
     pt.alpha = 0.3 + 0.7 * Math.sin(Date.now() * 0.003 + pt.x);
   });
 }
@@ -1118,7 +1398,28 @@ function checkProximity(p) {
   else if (!nearbyTarget && Math.hypot(p.x - 740, p.y - 610) < 65) {
     nearbyTarget = { type: 'pond', text: 'Tekan [E] untuk Melempar Joran Mancing di Danau 🎣' };
   }
-  // 8. Farm Plots
+  // 8. Forest Lake Fishing Pier (x: 1860, y: 480)
+  else if (!nearbyTarget && Math.hypot(p.x - 1860, p.y - 480) < 70) {
+    nearbyTarget = { type: 'pond', text: 'Tekan [E] untuk Mancing Ikan Mas di Danau Hutan 🎣🌊' };
+  }
+  // 9. Commercial Plot / Toko Zahy & Aurel (x: 1000..1300, y: 220..420)
+  else if (!nearbyTarget) {
+    const store = sharedState.store || { owned: false };
+    if (store.owned) {
+      if (p.x >= 1040 && p.x <= 1280 && p.y >= 260 && p.y <= 420) {
+        nearbyTarget = { type: 'manage_store', text: 'Tekan [E] untuk Kelola Toko Zahy & Aurel / Sewa Bot 🏪' };
+      }
+    } else {
+      if (Math.hypot(p.x - 1050, p.y - 380) < 70 || (p.x >= 1010 && p.x <= 1300 && p.y >= 230 && p.y <= 420)) {
+        nearbyTarget = { type: 'buy_land', text: 'Tekan [E] untuk Beli Kavling Tanah Toko (🪙 120) 🏗️' };
+      }
+    }
+  }
+  // 10. City Wishing Fountain (x: 1200, y: 1240)
+  if (!nearbyTarget && Math.hypot(p.x - 1200, p.y - 1240) < 75) {
+    nearbyTarget = { type: 'fountain', text: 'Tekan [E] untuk Lempar Koin Harapan Cinta ke Air Mancur ⛲🪙' };
+  }
+  // 11. Farm Plots
   else if (!nearbyTarget) {
     for (const plot of farmingPlots) {
       if (Math.hypot(p.x - (plot.x + 20), p.y - (plot.y + 20)) < 36) {
@@ -1146,33 +1447,42 @@ function checkProximity(p) {
 function render() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // 1. Draw Outdoor Grass & Paths
+  ctx.save();
+  ctx.translate(-camera.x, -camera.y);
+
+  // 1. Draw Outdoor Grass, Grand Boulevard & Connecting Roads (2400x1600)
   drawEnvironment();
 
-  // 2. Draw House
+  // 2. Draw House & Indoor Furniture
   drawHouse();
 
-  // 3. Draw Farm Plots
+  // 3. Draw Farm Plots & Crops
   drawFarmingPlots();
 
-  // 4. Draw Lake / Pond
+  // 4. Draw Commercial Plot & Toko Zahy & Aurel (Couple Mart)
+  drawBusinessPlotAndStore();
+
+  // 5. Draw Downtown Plaza, City Buildings & Wishing Fountain
+  drawCityCenterAndBuildings();
+
+  // 6. Draw Mini Forest, Romantic Lake, Fishing Pier & Campsite
+  drawForestAndCampingLake();
+
+  // 7. Draw Cafe Stand & Old Village Pond
+  drawCafeStand();
   drawPond();
 
-  // 5. Draw Cafe Stand & NPCs
-  drawCafeStand();
+  // 8. Draw Living NPCs, Citizens & Mimi the Cat
   drawNPCs();
 
-  // 6. Draw Hand-holding Link if lovers are holding hands
+  // 9. Draw Hand-holding Link if lovers are holding hands
   drawHandHoldingLink();
 
-  // 7. Draw Players
+  // 10. Draw Players (Zahy & Aurel)
   const sortedPlayers = Object.values(players).sort((a, b) => a.y - b.y);
   sortedPlayers.forEach(p => drawPlayer(p));
 
-  // 8. Ambient Day/Night Lighting Overlay & Fireflies
-  drawAmbientLighting();
-
-  // 9. Floating Texts
+  // 11. Floating Texts
   floatingTexts.forEach(ft => {
     ctx.save();
     ctx.fillStyle = ft.color;
@@ -1184,6 +1494,14 @@ function render() {
     ctx.fillText(ft.text, ft.x, ft.y);
     ctx.restore();
   });
+
+  // 12. Ambient Day/Night Lighting Overlay & Fireflies
+  drawAmbientLighting();
+
+  ctx.restore();
+
+  // 13. Radar Minimap HUD (Screen space bottom-right)
+  drawMinimap();
 
   requestAnimationFrame(loop);
 }
@@ -1200,31 +1518,70 @@ requestAnimationFrame(loop);
 
 // ================= ENVIRONMENT DETAILS =================
 function drawEnvironment() {
-  // Vibrant grass background
+  // Vibrant grass background across entire 2400x1600 world!
   ctx.fillStyle = '#659b5e';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillRect(0, 0, worldWidth, worldHeight);
 
-  // Cobblestone / Dirt Path connecting house, garden, pond, and shop
+  // Decorative grass textures & tufts
+  ctx.fillStyle = '#5c9255';
+  for (let gx = 60; gx < worldWidth; gx += 160) {
+    for (let gy = 60; gy < worldHeight; gy += 140) {
+      ctx.fillRect(gx + (gy % 50), gy, 10, 4);
+      ctx.fillRect(gx + (gy % 50) + 3, gy - 3, 4, 9);
+    }
+  }
+
+  // ================= MAIN ROADS & BOULEVARDS =================
+  // 1. Grand East-West Boulevard (Connecting Home, Store, Plaza & Forest)
+  ctx.fillStyle = '#c5a074';
+  ctx.fillRect(200, 680, 2000, 52); // Main Boulevard
+  ctx.fillStyle = '#b38d60';
+  ctx.fillRect(200, 676, 2000, 4);  // Road border top
+  ctx.fillRect(200, 732, 2000, 4);  // Road border bottom
+
+  // 2. Cobblestone / Dirt Path connecting Home, Garden, Pond, and Shop
   ctx.fillStyle = '#d4b28c';
-  // Path from house door down
-  ctx.fillRect(415, 290, 40, 260);
+  // Path from house door down to main boulevard
+  ctx.fillRect(415, 290, 40, 400);
   // Path branching to farm
   ctx.fillRect(360, 520, 190, 30);
   // Path branching to cafe & pond
   ctx.fillRect(455, 340, 200, 30);
-  ctx.fillRect(630, 340, 30, 200);
+  ctx.fillRect(630, 340, 30, 350);
   ctx.fillRect(630, 520, 100, 30);
-  // Path to shop
-  ctx.fillRect(455, 210, 300, 26);
+  // Path branching to store plot
+  ctx.fillRect(455, 210, 580, 28);
+  // Path connecting store entrance down to Main Boulevard
+  ctx.fillRect(1140, 420, 40, 270);
 
-  // Decorative Little Flowers & Bushes
+  // 3. Grand Downtown Boulevard from East-West Boulevard down to Downtown Plaza
+  ctx.fillStyle = '#94a3b8'; // Stone paved city avenue
+  ctx.fillRect(1150, 732, 100, 160);
+  ctx.fillStyle = '#cbd5e1';
+  // Decorative road center dashed line
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 3;
+  ctx.setLineDash([12, 12]);
+  ctx.beginPath();
+  ctx.moveTo(1200, 740);
+  ctx.lineTo(1200, 890);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Decorative Little Flowers & Bushes across districts
   const flowerPositions = [
     { x: 120, y: 380, color: '#ff6584' },
     { x: 150, y: 410, color: '#ffbe76' },
     { x: 190, y: 360, color: '#f8a5c2' },
     { x: 280, y: 580, color: '#ff6584' },
     { x: 570, y: 640, color: '#f8a5c2' },
-    { x: 880, y: 380, color: '#ffbe76' }
+    { x: 880, y: 380, color: '#ffbe76' },
+    { x: 950, y: 240, color: '#ff6584' },
+    { x: 1330, y: 230, color: '#f8a5c2' },
+    { x: 1050, y: 640, color: '#ffbe76' },
+    { x: 1350, y: 640, color: '#ff6584' },
+    { x: 1680, y: 620, color: '#f8a5c2' },
+    { x: 1720, y: 760, color: '#ffbe76' }
   ];
   flowerPositions.forEach(f => {
     ctx.fillStyle = f.color;
@@ -1237,11 +1594,12 @@ function drawEnvironment() {
     ctx.fill();
   });
 
-  // Trees
+  // Trees near home and roads
   drawTree(80, 200);
   drawTree(120, 600);
   drawTree(220, 650);
   drawTree(880, 260);
+  drawTree(960, 460);
 }
 
 function drawTree(x, y) {
@@ -1868,7 +2226,725 @@ function drawAmbientLighting() {
 
   if (overlayColor !== 'rgba(0,0,0,0)') {
     ctx.fillStyle = overlayColor;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, worldWidth, worldHeight);
+  }
+}
+
+// ================= COMMERCIAL PLOT & STORE (TOKO ZAHY & AUREL) =================
+function drawBusinessPlotAndStore() {
+  const plotX = 1010;
+  const plotY = 220;
+  const plotW = 300;
+  const plotH = 200;
+
+  const store = sharedState.store || { owned: false, level: 1, hiredEmployees: [], stockedItems: [], dailyRevenue: 0, visitorCount: 0 };
+
+  if (!store.owned) {
+    // ===== KAVLING TANAH BELUM DIBELI =====
+    // Ground plot patch
+    ctx.fillStyle = '#8f7756';
+    ctx.fillRect(plotX, plotY, plotW, plotH);
+    ctx.fillStyle = '#a88d67';
+    ctx.fillRect(plotX + 6, plotY + 6, plotW - 12, plotH - 12);
+
+    // Grid lines (blueprint / land markers)
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([6, 6]);
+    for (let x = plotX + 30; x < plotX + plotW; x += 30) {
+      ctx.beginPath();
+      ctx.moveTo(x, plotY + 6);
+      ctx.lineTo(x, plotY + plotH - 6);
+      ctx.stroke();
+    }
+    for (let y = plotY + 30; y < plotY + plotH; y += 30) {
+      ctx.beginPath();
+      ctx.moveTo(plotX + 6, y);
+      ctx.lineTo(plotX + plotW - 6, y);
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+
+    // Corner Stakes with Red/White boundary ribbons
+    const corners = [
+      { x: plotX + 4, y: plotY + 4 },
+      { x: plotX + plotW - 4, y: plotY + 4 },
+      { x: plotX + 4, y: plotY + plotH - 4 },
+      { x: plotX + plotW - 4, y: plotY + plotH - 4 }
+    ];
+    corners.forEach(c => {
+      ctx.fillStyle = '#8d5b4c';
+      ctx.fillRect(c.x - 3, c.y - 14, 6, 18);
+      ctx.fillStyle = '#e53e3e';
+      ctx.beginPath();
+      ctx.arc(c.x, c.y - 15, 4, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    // Big Construction Signboard (x: 1100, y: 260)
+    ctx.fillStyle = '#654321';
+    ctx.fillRect(1110, 275, 8, 45);
+    ctx.fillRect(1210, 275, 8, 45);
+
+    // Signboard panel
+    ctx.fillStyle = '#fffdf7';
+    ctx.fillRect(1080, 240, 170, 75);
+    ctx.strokeStyle = '#d97706';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(1080, 240, 170, 75);
+
+    ctx.font = 'bold 12px "Segoe UI", sans-serif';
+    ctx.fillStyle = '#b45309';
+    ctx.textAlign = 'center';
+    ctx.fillText('🏗️ KAVLING BISNIS', 1165, 258);
+
+    ctx.font = 'bold 10px "Segoe UI", sans-serif';
+    ctx.fillStyle = '#1e293b';
+    ctx.fillText('Tanah Toko Zahy & Aurel', 1165, 274);
+    ctx.font = '10px "Segoe UI", sans-serif';
+    ctx.fillStyle = '#64748b';
+    ctx.fillText('Luas: 400m² • Harga: 🪙 120', 1165, 289);
+
+    ctx.fillStyle = '#e11d48';
+    ctx.font = 'bold 10px "Segoe UI", sans-serif';
+    ctx.fillText('Tekan [E] untuk Beli Tanah! ✨', 1165, 305);
+
+  } else {
+    // ===== TOKO SUDAH DIBANGUN (COUPLE MART) =====
+    const bx = plotX + 15;
+    const by = plotY + 15;
+    const bw = plotW - 30;
+    const bh = plotH - 25;
+
+    // Outer shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.18)';
+    ctx.fillRect(bx - 6, by + bh - 6, bw + 12, 16);
+
+    // Floor (Checkered Peach & Ivory Tiles)
+    ctx.fillStyle = '#fff7ed';
+    ctx.fillRect(bx, by, bw, bh);
+    ctx.fillStyle = '#fed7aa';
+    const tileSize = 20;
+    for (let tx = bx; tx < bx + bw; tx += tileSize) {
+      for (let ty = by; ty < by + bh; ty += tileSize) {
+        if (((tx - bx) / tileSize + (ty - by) / tileSize) % 2 === 0) {
+          ctx.fillRect(tx, ty, Math.min(tileSize, bx + bw - tx), Math.min(tileSize, by + bh - ty));
+        }
+      }
+    }
+
+    // Walls (North, West, East, South)
+    ctx.fillStyle = '#78350f';
+    ctx.fillRect(bx, by, bw, 22); // North
+    ctx.fillRect(bx, by, 16, bh); // West
+    ctx.fillRect(bx + bw - 16, by, 16, bh); // East
+
+    // South wall leaving door opening at x: 1130..1190
+    ctx.fillRect(bx, by + bh - 16, 1130 - bx, 16);
+    ctx.fillRect(1190, by + bh - 16, bx + bw - 1190, 16);
+
+    // Door Welcome Mat
+    ctx.fillStyle = '#38a169';
+    ctx.fillRect(1135, by + bh - 12, 50, 16);
+    ctx.font = 'bold 9px sans-serif';
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.fillText('WELCOME ❤️', 1160, by + bh);
+
+    // Striped Awning & Roof Signboard
+    const roofY = by - 16;
+    ctx.fillStyle = '#ff6584';
+    ctx.fillRect(bx - 8, roofY, bw + 16, 18);
+    ctx.fillStyle = '#ffffff';
+    for (let i = 0; i < 11; i++) {
+      ctx.fillRect(bx - 8 + i * 26, roofY, 13, 18);
+    }
+
+    // 3D Signboard: TOKO ZAHY & AUREL
+    ctx.fillStyle = '#1e293b';
+    ctx.fillRect(bx + 20, roofY - 22, bw - 40, 24);
+    ctx.strokeStyle = '#f59e0b';
+    ctx.lineWidth = 2.5;
+    ctx.strokeRect(bx + 20, roofY - 22, bw - 40, 24);
+    ctx.font = 'bold 12px "Segoe UI", sans-serif';
+    ctx.fillStyle = '#fde047';
+    ctx.textAlign = 'center';
+    ctx.fillText('🏪 TOKO ZAHY & AUREL ❤️', bx + bw / 2, roofY - 6);
+
+    // Interior: Shelves along north wall
+    // 1. Fruit Shelf at x: 1060, y: 260
+    const dispFruit = assetImgs['disp_fruit'];
+    if (dispFruit && dispFruit.complete && dispFruit.naturalWidth > 0) {
+      ctx.drawImage(dispFruit, 1055, 255, 42, 42);
+    } else {
+      ctx.fillStyle = '#d97706';
+      ctx.fillRect(1055, 260, 42, 34);
+      ctx.font = '14px sans-serif';
+      ctx.fillText('🍓🥕', 1076, 280);
+    }
+
+    // 2. Bread / Bakery Shelf at x: 1205, y: 260
+    const dispBread = assetImgs['disp_bread'];
+    if (dispBread && dispBread.complete && dispBread.naturalWidth > 0) {
+      ctx.drawImage(dispBread, 1205, 255, 42, 42);
+    } else {
+      ctx.fillStyle = '#b45309';
+      ctx.fillRect(1205, 260, 42, 34);
+      ctx.font = '14px sans-serif';
+      ctx.fillText('🥖🍰', 1226, 280);
+    }
+
+    // 3. Clothing Rack at x: 1240, y: 320
+    const clothRack = assetImgs['clothing_rack'];
+    if (clothRack && clothRack.complete && clothRack.naturalWidth > 0) {
+      ctx.drawImage(clothRack, 1238, 315, 36, 42);
+    } else {
+      ctx.fillStyle = '#475569';
+      ctx.fillRect(1240, 320, 30, 35);
+      ctx.font = '12px sans-serif';
+      ctx.fillText('👗👕', 1255, 340);
+    }
+
+    // 4. Checkout Counter & Cash Register at x: 1125, y: 315
+    ctx.fillStyle = '#78350f';
+    ctx.fillRect(1125, 320, 65, 32);
+    ctx.fillStyle = '#9a3412';
+    ctx.fillRect(1123, 316, 69, 7); // Countertop
+
+    const cashReg = assetImgs['cash_reg'];
+    if (cashReg && cashReg.complete && cashReg.naturalWidth > 0) {
+      ctx.drawImage(cashReg, 1142, 290, 32, 32);
+    } else {
+      ctx.font = '16px sans-serif';
+      ctx.fillText('📟', 1157, 314);
+    }
+
+    // 5. Stocked Goods Floating Badge
+    const stockCount = (store.stockedItems && store.stockedItems.length) || 0;
+    ctx.font = 'bold 9px "Segoe UI", sans-serif';
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(1130, 355, 55, 13);
+    ctx.fillStyle = '#34d399';
+    ctx.fillText(`Stok: ${stockCount} brg`, 1157, 365);
+
+    // ================= HIRED BOT EMPLOYEES =================
+    // 1. RANI THE CASHIER (Behind checkout counter at x: 1157, y: 300)
+    if (store.hiredEmployees && store.hiredEmployees.includes('rani')) {
+      const raniBob = Math.sin(Date.now() * 0.005) * 1.5;
+      ctx.save();
+      ctx.translate(1157, 300);
+
+      // Body (Green Apron)
+      ctx.fillStyle = '#10b981';
+      ctx.fillRect(-7, -4 + raniBob, 14, 14);
+
+      // Head
+      ctx.fillStyle = '#ffe0bd';
+      ctx.beginPath();
+      ctx.arc(0, -12 + raniBob, 8, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Hair (Neat Brown Bobcut)
+      ctx.fillStyle = '#451a03';
+      ctx.beginPath();
+      ctx.arc(0, -14 + raniBob, 9, Math.PI, Math.PI * 2);
+      ctx.fill();
+      ctx.fillRect(-9, -14 + raniBob, 3, 10);
+      ctx.fillRect(6, -14 + raniBob, 3, 10);
+
+      // Cheerful Eyes & Smile
+      ctx.fillStyle = '#1e293b';
+      ctx.fillRect(-3, -13 + raniBob, 2, 2.5);
+      ctx.fillRect(2, -13 + raniBob, 2, 2.5);
+
+      // Name Tag
+      ctx.font = 'bold 9px "Segoe UI", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = 'rgba(0,0,0,0.65)';
+      ctx.fillRect(-28, -32 + raniBob, 56, 13);
+      ctx.fillStyle = '#6ee7b7';
+      ctx.fillText('Rani (Kasir) 👩‍💼', 0, -22 + raniBob);
+
+      ctx.restore();
+    }
+
+    // 2. DONI THE SHELF STOCKER (Walking between shelves at x: 1085, y: 320)
+    if (store.hiredEmployees && store.hiredEmployees.includes('doni')) {
+      const doniBob = Math.sin(Date.now() * 0.006) * 1.8;
+      const doniWalk = Math.sin(Date.now() * 0.002) * 20; // paces near shelves
+      ctx.save();
+      ctx.translate(1085 + doniWalk, 330);
+
+      // Legs
+      ctx.fillStyle = '#1e293b';
+      ctx.fillRect(-4, 6 + doniBob, 3, 7);
+      ctx.fillRect(1, 6 - doniBob, 3, 7);
+
+      // Body (Blue Uniform)
+      ctx.fillStyle = '#2563eb';
+      ctx.fillRect(-7, -6 + doniBob, 14, 14);
+
+      // Head
+      ctx.fillStyle = '#fcd34d';
+      ctx.beginPath();
+      ctx.arc(0, -14 + doniBob, 8, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Cap
+      ctx.fillStyle = '#1d4ed8';
+      ctx.fillRect(-8, -21 + doniBob, 16, 5);
+      ctx.fillRect(-4, -24 + doniBob, 10, 4);
+
+      // Name Tag
+      ctx.font = 'bold 9px "Segoe UI", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = 'rgba(0,0,0,0.65)';
+      ctx.fillRect(-34, -36 + doniBob, 68, 13);
+      ctx.fillStyle = '#93c5fd';
+      ctx.fillText('Doni (Pegawai) 🧑‍💼', 0, -26 + doniBob);
+
+      ctx.restore();
+    }
+
+    // Animated Customer visiting Toko
+    const custBob = Math.sin(Date.now() * 0.004) * 1.5;
+    ctx.save();
+    ctx.translate(1140, 360);
+    ctx.fillStyle = '#ec4899';
+    ctx.fillRect(-6, -4 + custBob, 12, 12);
+    ctx.fillStyle = '#fed7aa';
+    ctx.beginPath();
+    ctx.arc(0, -11 + custBob, 7, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.font = 'bold 8px sans-serif';
+    ctx.fillStyle = '#fff';
+    ctx.textAlign = 'center';
+    ctx.fillText('Pembeli 🛍️', 0, -20 + custBob);
+    ctx.restore();
+  }
+}
+
+// ================= DOWNTOWN PLAZA & CITY BUILDINGS =================
+function drawCityCenterAndBuildings() {
+  const plazaX = 780;
+  const plazaY = 880;
+  const plazaW = 900;
+  const plazaH = 620;
+
+  // Plaza Stone Pavement
+  ctx.fillStyle = '#e2e8f0';
+  ctx.fillRect(plazaX, plazaY, plazaW, plazaH);
+
+  // Decorative Paver Border
+  ctx.strokeStyle = '#cbd5e1';
+  ctx.lineWidth = 4;
+  ctx.strokeRect(plazaX + 6, plazaY + 6, plazaW - 12, plazaH - 12);
+
+  // Plaza Decorative Radial Pattern
+  ctx.strokeStyle = '#f1f5f9';
+  ctx.lineWidth = 2;
+  for (let r = 50; r < 240; r += 45) {
+    ctx.beginPath();
+    ctx.arc(1200, 1240, r, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  // ================= 4 DOWNTOWN BUILDINGS ALONG NORTH =================
+  const buildings = [
+    { x: 820, y: 910, w: 130, h: 140, name: 'Balai Kota', icon: '🏛️', color: '#334155', roof: '#475569', asset: 'bldg_a' },
+    { x: 1020, y: 910, w: 130, h: 140, name: 'Toko Roti & Kue', icon: '🥖', color: '#7c2d12', roof: '#ea580c', asset: 'bldg_b' },
+    { x: 1320, y: 910, w: 130, h: 140, name: 'Butik Pasangan', icon: '👗', color: '#831843', roof: '#db2777', asset: 'bldg_c' },
+    { x: 1520, y: 910, w: 130, h: 140, name: 'Bank Desa', icon: '🏦', color: '#14532d', roof: '#16a34a', asset: 'bldg_d' }
+  ];
+
+  buildings.forEach(b => {
+    // Drop shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.18)';
+    ctx.fillRect(b.x - 4, b.y + b.h - 6, b.w + 8, 14);
+
+    // Wall Structure
+    ctx.fillStyle = b.color;
+    ctx.fillRect(b.x, b.y + 25, b.w, b.h - 25);
+
+    // Roof
+    ctx.fillStyle = b.roof;
+    ctx.beginPath();
+    ctx.moveTo(b.x - 8, b.y + 25);
+    ctx.lineTo(b.x + b.w / 2, b.y);
+    ctx.lineTo(b.x + b.w + 8, b.y + 25);
+    ctx.fill();
+
+    // Windows (Glowing at night)
+    const isNight = sharedState.timeOfDay >= 18 || sharedState.timeOfDay < 5;
+    ctx.fillStyle = isNight ? '#fef08a' : '#bae6fd';
+    for (let wx = b.x + 16; wx < b.x + b.w - 20; wx += 32) {
+      for (let wy = b.y + 40; wy < b.y + b.h - 45; wy += 32) {
+        ctx.fillRect(wx, wy, 20, 20);
+        ctx.strokeStyle = '#334155';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(wx, wy, 20, 20);
+      }
+    }
+
+    // Doorway
+    ctx.fillStyle = '#1e293b';
+    ctx.fillRect(b.x + b.w / 2 - 14, b.y + b.h - 35, 28, 35);
+    ctx.fillStyle = '#fbbf24';
+    ctx.beginPath();
+    ctx.arc(b.x + b.w / 2 + 7, b.y + b.h - 18, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Signboard on Front
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+    ctx.fillRect(b.x + 10, b.y + 28, b.w - 20, 18);
+    ctx.font = 'bold 10px "Segoe UI", sans-serif';
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.fillText(`${b.icon} ${b.name}`, b.x + b.w / 2, b.y + 41);
+  });
+
+  // ================= AIR MANCUR HARAPAN CINTA =================
+  const fx = 1200;
+  const fy = 1240;
+
+  // Outer stone basin
+  ctx.fillStyle = '#94a3b8';
+  ctx.beginPath();
+  ctx.arc(fx, fy, 48, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#cbd5e1';
+  ctx.beginPath();
+  ctx.arc(fx, fy, 44, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Crystal Pool Water
+  ctx.fillStyle = '#38bdf8';
+  ctx.beginPath();
+  ctx.arc(fx, fy, 40, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Shimmering Coins in fountain
+  const coinCoords = [
+    { dx: -14, dy: -8 }, { dx: 12, dy: 10 }, { dx: -8, dy: 16 }, { dx: 18, dy: -12 }
+  ];
+  coinCoords.forEach(c => {
+    ctx.fillStyle = '#fbbf24';
+    ctx.beginPath();
+    ctx.arc(fx + c.dx, fy + c.dy, 3, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // Animated Water Wavelets
+  ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+  ctx.lineWidth = 2;
+  const rippleR = 12 + (Date.now() * 0.015) % 22;
+  ctx.beginPath();
+  ctx.arc(fx, fy, rippleR, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Central Fountain Pedestal
+  ctx.fillStyle = '#64748b';
+  ctx.beginPath();
+  ctx.arc(fx, fy, 14, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Cascading Spout & Water Spray Particles
+  const spoutTime = Date.now() * 0.008;
+  for (let a = 0; a < 8; a++) {
+    const angle = (a / 8) * Math.PI * 2 + spoutTime;
+    const dist = 18 + Math.sin(spoutTime * 2 + a) * 8;
+    const px = fx + Math.cos(angle) * dist;
+    const py = fy + Math.sin(angle) * dist;
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
+    ctx.beginPath();
+    ctx.arc(px, py, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Heart on Spire
+  ctx.font = '16px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('💖', fx, fy - 6);
+
+  // Fountain Banner
+  ctx.font = 'bold 11px "Segoe UI", sans-serif';
+  ctx.fillStyle = 'rgba(0,0,0,0.7)';
+  ctx.fillRect(fx - 70, fy + 52, 140, 18);
+  ctx.fillStyle = '#f472b6';
+  ctx.fillText('⛲ Air Mancur Harapan [E]', fx, fy + 65);
+
+  // Street Lamps at plaza corners
+  const lampX = [840, 1080, 1320, 1560];
+  lampX.forEach(lx => {
+    // Post
+    ctx.fillStyle = '#1e293b';
+    ctx.fillRect(lx - 2, 1140, 4, 38);
+    // Lantern head
+    ctx.fillStyle = '#fbbf24';
+    ctx.beginPath();
+    ctx.arc(lx, 1136, 6, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Warm glow if evening/night
+    if (sharedState.timeOfDay >= 17.5 || sharedState.timeOfDay < 5.5) {
+      ctx.fillStyle = 'rgba(251, 191, 36, 0.22)';
+      ctx.beginPath();
+      ctx.arc(lx, 1136, 38, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  });
+
+  // Couple park benches
+  ctx.fillStyle = '#854d0e';
+  ctx.fillRect(940, 1340, 45, 12);
+  ctx.fillRect(1415, 1340, 45, 12);
+}
+
+// ================= FOREST, CAMPING & LAKE DISTRICT =================
+function drawForestAndCampingLake() {
+  // Mini Forest Creek Inlet under bridge
+  ctx.fillStyle = '#38bdf8';
+  ctx.fillRect(1710, 440, 50, 80);
+
+  // Wooden Footbridge (x: 1715, y: 460)
+  const brgImg = assetImgs['bridge'];
+  if (brgImg && brgImg.complete && brgImg.naturalWidth > 0) {
+    ctx.drawImage(brgImg, 1705, 450, 60, 55);
+  } else {
+    // Handcrafted Wood Planks
+    ctx.fillStyle = '#78350f';
+    ctx.fillRect(1705, 455, 60, 48);
+    ctx.strokeStyle = '#451a03';
+    ctx.lineWidth = 2;
+    for (let px = 1710; px <= 1760; px += 10) {
+      ctx.beginPath();
+      ctx.moveTo(px, 455);
+      ctx.lineTo(px, 503);
+      ctx.stroke();
+    }
+    // Rails
+    ctx.fillStyle = '#9a3412';
+    ctx.fillRect(1705, 452, 60, 4);
+    ctx.fillRect(1705, 501, 60, 4);
+  }
+
+  // ================= GRAND ROMANTIC LAKE =================
+  const lakeX = 2000;
+  const lakeY = 480;
+  const lakeRx = 180;
+  const lakeRy = 110;
+
+  // Deep Water
+  const waterGrad = ctx.createRadialGradient(lakeX, lakeY, 30, lakeX, lakeY, lakeRx);
+  waterGrad.addColorStop(0, '#1d4ed8');
+  waterGrad.addColorStop(1, '#2563eb');
+  ctx.fillStyle = waterGrad;
+  ctx.beginPath();
+  ctx.ellipse(lakeX, lakeY, lakeRx, lakeRy, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Lake Shoreline Border
+  ctx.strokeStyle = '#1e3a8a';
+  ctx.lineWidth = 4;
+  ctx.stroke();
+
+  // Swimming Fish Shadows
+  const fishTime = Date.now() * 0.001;
+  for (let f = 0; f < 3; f++) {
+    const fx = lakeX + Math.sin(fishTime + f * 2) * (70 + f * 25);
+    const fy = lakeY + Math.cos(fishTime * 0.8 + f * 2) * (35 + f * 15);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+    ctx.beginPath();
+    ctx.ellipse(fx, fy, 6, 2.5, fishTime + f, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Wooden Fishing Pier at Lake (x: 1820..1910, y: 465..505)
+  ctx.fillStyle = '#854d0e';
+  ctx.fillRect(1820, 465, 90, 40);
+  ctx.strokeStyle = '#58310c';
+  ctx.lineWidth = 2;
+  for (let px = 1830; px <= 1905; px += 12) {
+    ctx.beginPath();
+    ctx.moveTo(px, 465);
+    ctx.lineTo(px, 505);
+    ctx.stroke();
+  }
+  ctx.font = '16px sans-serif';
+  ctx.fillText('🎣', 1885, 492);
+  ctx.font = 'bold 9px "Segoe UI", sans-serif';
+  ctx.fillStyle = '#fff';
+  ctx.textAlign = 'center';
+  ctx.fillText('Dermaga Hutan', 1865, 485);
+
+  // ================= CAMPSITE & ROMANTIC CAMPFIRE =================
+  const campX = 2140;
+  const campY = 280;
+
+  // Couple Camping Tent
+  ctx.fillStyle = '#ea580c';
+  ctx.beginPath();
+  ctx.moveTo(campX - 35, campY + 20);
+  ctx.lineTo(campX, campY - 30);
+  ctx.lineTo(campX + 35, campY + 20);
+  ctx.fill();
+  // Tent door
+  ctx.fillStyle = '#431407';
+  ctx.beginPath();
+  ctx.moveTo(campX - 14, campY + 20);
+  ctx.lineTo(campX, campY - 14);
+  ctx.lineTo(campX + 14, campY + 20);
+  ctx.fill();
+  ctx.font = '12px sans-serif';
+  ctx.fillText('⛺', campX, campY);
+
+  // Campfire (x: 2075, y: 300)
+  const fireX = 2075;
+  const fireY = 300;
+
+  // Fire ring stones
+  ctx.fillStyle = '#64748b';
+  for (let a = 0; a < 8; a++) {
+    const sa = (a / 8) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.arc(fireX + Math.cos(sa) * 12, fireY + Math.sin(sa) * 8, 3.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Fire logs
+  ctx.fillStyle = '#78350f';
+  ctx.fillRect(fireX - 10, fireY - 3, 20, 6);
+  ctx.fillRect(fireX - 3, fireY - 10, 6, 20);
+
+  // Dancing Flames
+  const flameFlicker = Math.sin(Date.now() * 0.02) * 3;
+  ctx.fillStyle = '#ef4444';
+  ctx.beginPath();
+  ctx.arc(fireX, fireY - 6 + flameFlicker, 7, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#f59e0b';
+  ctx.beginPath();
+  ctx.arc(fireX, fireY - 8 + flameFlicker, 4.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#fef08a';
+  ctx.beginPath();
+  ctx.arc(fireX, fireY - 9 + flameFlicker, 2.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Floating spark embers
+  const sparkY = (Date.now() * 0.05) % 25;
+  ctx.fillStyle = '#fbbf24';
+  ctx.beginPath();
+  ctx.arc(fireX + Math.sin(sparkY) * 6, fireY - 10 - sparkY, 1.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Tree Stumps / Log seats around fire
+  ctx.fillStyle = '#854d0e';
+  ctx.beginPath();
+  ctx.ellipse(fireX - 22, fireY, 8, 6, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(fireX + 22, fireY, 8, 6, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Dense Pine Trees scattered
+  const pineTrees = [
+    { x: 1800, y: 220 }, { x: 1880, y: 160 }, { x: 1960, y: 230 },
+    { x: 2230, y: 180 }, { x: 2310, y: 260 }, { x: 2280, y: 440 },
+    { x: 2220, y: 560 }, { x: 1950, y: 640 }, { x: 2100, y: 650 },
+    { x: 1840, y: 720 }, { x: 2260, y: 740 }
+  ];
+  pineTrees.forEach(pt => {
+    // Pine trunk
+    ctx.fillStyle = '#58310c';
+    ctx.fillRect(pt.x - 5, pt.y, 10, 24);
+    // Pine foliage layers (Triangle tiers)
+    ctx.fillStyle = '#14532d';
+    for (let layer = 0; layer < 3; layer++) {
+      const ly = pt.y - layer * 14;
+      const lw = 28 - layer * 6;
+      ctx.beginPath();
+      ctx.moveTo(pt.x - lw, ly + 8);
+      ctx.lineTo(pt.x, ly - 14);
+      ctx.lineTo(pt.x + lw, ly + 8);
+      ctx.fill();
+    }
+  });
+}
+
+// ================= REAL-TIME RADAR MINIMAP HUD =================
+function drawMinimap() {
+  const mCanvas = document.getElementById('minimapCanvas');
+  if (!mCanvas) return;
+  const mctx = mCanvas.getContext('2d');
+  const mw = mCanvas.width;
+  const mh = mCanvas.height;
+  mctx.clearRect(0, 0, mw, mh);
+
+  // Background map
+  mctx.fillStyle = '#3d6c37';
+  mctx.fillRect(0, 0, mw, mh);
+
+  // Scale factors
+  const sx = mw / worldWidth;
+  const sy = mh / worldHeight;
+
+  // Roads
+  mctx.fillStyle = '#a6825c';
+  // Main East-West road
+  mctx.fillRect(0, 680 * sy, mw, 52 * sy);
+  // North-South boulevard
+  mctx.fillRect(1150 * sx, 732 * sy, 100 * sx, 180 * sy);
+
+  // City plaza area
+  mctx.fillStyle = '#cbd5e1';
+  mctx.fillRect(780 * sx, 880 * sy, 900 * sx, 620 * sy);
+
+  // Lake
+  mctx.fillStyle = '#2563eb';
+  mctx.beginPath();
+  mctx.ellipse(2000 * sx, 480 * sy, 180 * sx, 110 * sy, 0, 0, Math.PI * 2);
+  mctx.fill();
+
+  // House
+  mctx.fillStyle = '#e11d48';
+  mctx.fillRect(280 * sx, 80 * sy, 310 * sx, 210 * sy);
+
+  // Commercial Plot / Store
+  const storeOwned = sharedState.store && sharedState.store.owned;
+  mctx.fillStyle = storeOwned ? '#10b981' : '#f59e0b';
+  mctx.fillRect(1010 * sx, 220 * sy, 300 * sx, 200 * sy);
+
+  // Camera Viewport Box (white border)
+  mctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+  mctx.lineWidth = 1.5;
+  mctx.strokeRect(camera.x * sx, camera.y * sy, canvas.width * sx, canvas.height * sy);
+
+  // Other Player dot (Hot Pink)
+  const partnerId = Object.keys(players).find(id => id !== myId);
+  if (partnerId && players[partnerId]) {
+    mctx.fillStyle = '#ff1493';
+    mctx.beginPath();
+    mctx.arc(players[partnerId].x * sx, players[partnerId].y * sy, 3.5, 0, Math.PI * 2);
+    mctx.fill();
+    mctx.strokeStyle = '#fff';
+    mctx.lineWidth = 1;
+    mctx.stroke();
+  }
+
+  // Local Player dot (Bright Cyan)
+  const p = players[myId];
+  if (p) {
+    mctx.fillStyle = '#06b6d4';
+    mctx.beginPath();
+    mctx.arc(p.x * sx, p.y * sy, 4, 0, Math.PI * 2);
+    mctx.fill();
+    mctx.strokeStyle = '#fff';
+    mctx.lineWidth = 1.2;
+    mctx.stroke();
   }
 }
 

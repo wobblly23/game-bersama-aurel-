@@ -260,6 +260,14 @@ class HybridNetwork {
         { from: 'Cinta Kita', text: 'Selamat datang di rumah impian kita! Mari saling menjaga dan merawat tempat ini bersama ❤️', time: 'Hari ini' }
       ],
       cafeStand: { stockedItems: [], totalSold: 0 },
+      store: {
+        owned: false,
+        level: 1,
+        hiredEmployees: [],
+        stockedItems: [],
+        dailyRevenue: 0,
+        visitorCount: 0
+      },
       timeOfDay: 7.0,
       dayCount: 1
     };
@@ -345,6 +353,32 @@ class HybridNetwork {
         if (this.conn) this.conn.send({ type: 'cafe_sale', data: saleData });
       }
 
+      // Automated Store Sales (if owned)
+      if (state.store && state.store.owned && state.store.stockedItems && state.store.stockedItems.length > 0) {
+        const hasRani = state.store.hiredEmployees.includes('rani');
+        const hasDoni = state.store.hiredEmployees.includes('doni');
+        const chance = hasRani ? 0.35 : 0.18;
+
+        if (Math.random() < chance) {
+          const soldItem = state.store.stockedItems.pop();
+          const earned = soldItem.price || 40;
+          state.coins += earned;
+          state.store.dailyRevenue += earned;
+          state.store.visitorCount++;
+          if (hasDoni) state.lovePoints += 2;
+
+          const storeSaleData = {
+            item: soldItem.name,
+            price: earned,
+            coins: state.coins,
+            lovePoints: state.lovePoints,
+            store: state.store
+          };
+          this.trigger('store_sale', storeSaleData);
+          if (this.conn) this.conn.send({ type: 'store_sale', data: storeSaleData });
+        }
+      }
+
       // Periodically save world (every 10s)
       if (Math.floor(state.timeOfDay * 10) % 5 === 0) {
         this.saveWorld();
@@ -428,6 +462,14 @@ class HybridNetwork {
       this.performShopTransaction('client', data);
     } else if (type === 'stock_cafe') {
       this.performStockCafe('client', data);
+    } else if (type === 'buy_land') {
+      this.performBuyLand('client');
+    } else if (type === 'hire_employee') {
+      this.performHireEmployee('client', data);
+    } else if (type === 'stock_store') {
+      this.performStockStore('client', data);
+    } else if (type === 'make_fountain_wish') {
+      this.performFountainWish('client');
     }
   }
 
@@ -500,6 +542,14 @@ class HybridNetwork {
         this.performShopTransaction('host', data);
       } else if (event === 'stock_cafe') {
         this.performStockCafe('host', data);
+      } else if (event === 'buy_land') {
+        this.performBuyLand('host');
+      } else if (event === 'hire_employee') {
+        this.performHireEmployee('host', data);
+      } else if (event === 'stock_store') {
+        this.performStockStore('host', data);
+      } else if (event === 'make_fountain_wish') {
+        this.performFountainWish('host');
       }
     } else {
       // Client forwards all actions to Host
@@ -763,6 +813,84 @@ class HybridNetwork {
     this.trigger('cafe_updated', res);
     if (this.conn) this.conn.send({ type: 'cafe_updated', data: res });
     this.saveWorld();
+  }
+
+  performBuyLand(fromId) {
+    const state = this.localState.sharedState;
+    if (state.coins >= 120 && !state.store.owned) {
+      state.coins -= 120;
+      state.store.owned = true;
+      state.store.level = 1;
+      state.lovePoints += 30;
+
+      const res = {
+        store: state.store,
+        coins: state.coins,
+        lovePoints: state.lovePoints,
+        message: 'Selamat! Tanah kavling terbeli dan Toko Pasangan resmi berdiri! 🏪🎉'
+      };
+      this.trigger('land_bought', res);
+      if (this.conn) this.conn.send({ type: 'land_bought', data: res });
+      this.saveWorld();
+    }
+  }
+
+  performHireEmployee(fromId, { employeeId, cost }) {
+    const state = this.localState.sharedState;
+    if (state.coins >= cost && !state.store.hiredEmployees.includes(employeeId)) {
+      state.coins -= cost;
+      state.store.hiredEmployees.push(employeeId);
+      state.lovePoints += 20;
+
+      const empName = employeeId === 'rani' ? 'Rani (Kasir Cepat)' : 'Doni (Pramuniaga)';
+      const res = {
+        store: state.store,
+        coins: state.coins,
+        lovePoints: state.lovePoints,
+        employeeId,
+        message: `Berhasil menyewa pegawai bot ${empName}! 👩‍💼`
+      };
+      this.trigger('employee_hired', res);
+      if (this.conn) this.conn.send({ type: 'employee_hired', data: res });
+      this.saveWorld();
+    }
+  }
+
+  performStockStore(fromId, { itemId }) {
+    const fridge = this.localState.sharedState.fridge;
+    const item = fridge.find(i => i.id === itemId && i.count > 0);
+    if (!item) return;
+
+    item.count--;
+    const price = itemId.includes('salad') ? 65 : itemId.includes('grilled') ? 85 : itemId.includes('crop') ? 45 : 30;
+    this.localState.sharedState.store.stockedItems.push({
+      id: item.id,
+      name: item.name,
+      price,
+      icon: item.icon
+    });
+
+    const res = { store: this.localState.sharedState.store, fridge };
+    this.trigger('store_stocked', res);
+    if (this.conn) this.conn.send({ type: 'store_stocked', data: res });
+    this.saveWorld();
+  }
+
+  performFountainWish(fromId) {
+    const state = this.localState.sharedState;
+    if (state.coins >= 1) {
+      state.coins -= 1;
+      state.lovePoints += 5;
+
+      const res = {
+        coins: state.coins,
+        lovePoints: state.lovePoints,
+        message: '💫 Koin dilempar ke Air Mancur Harapan! Semoga cinta kalian abadi ❤️'
+      };
+      this.trigger('fountain_wished', res);
+      if (this.conn) this.conn.send({ type: 'fountain_wished', data: res });
+      this.saveWorld();
+    }
   }
 }
 

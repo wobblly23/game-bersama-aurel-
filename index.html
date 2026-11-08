@@ -71,6 +71,12 @@
           <span id="btn-fullscreen" style="cursor:pointer; margin-left:8px;" title="Layar Penuh">⛶</span>
           <span id="save-indicator" style="font-size: 11px; color:#48bb78; margin-left:6px; opacity:0; transition:opacity 0.4s;" title="Data Tersimpan Otomatis">💾 Tersimpan</span>
         </div>
+
+        <!-- Minimap Radar -->
+        <div id="minimap-container" title="Peta Kota & Desa">
+          <canvas id="minimapCanvas" width="130" height="90"></canvas>
+          <div id="minimap-legend">🗺️ Peta Kota</div>
+        </div>
       </div>
 
       <!-- Player Survival Status (Energy & Hunger) -->
@@ -248,6 +254,95 @@
 
         <h4 style="font-size:14px; margin-bottom:8px;">Pilih Makanan dari Kulkas untuk Dijual:</h4>
         <div class="item-grid" id="cafe-stock-grid"></div>
+      </div>
+    </div>
+
+    <!-- ================= MODAL: BELI TANAH KAVLING ================= -->
+    <div class="modal-overlay" id="modal-buy-land">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>🏗️ Kavling Tanah Bisnis Pasangan</h3>
+          <button class="btn-close" onclick="closeAllModals()">✕</button>
+        </div>
+        <div style="text-align:center; margin-bottom:14px;">
+          <img src="assets/shop_cash-register.png" style="width:72px; height:72px; margin-bottom:8px;">
+          <h4 style="color:#2d3748; font-size:16px;">Bangun Toko & Bisnis Berdua!</h4>
+          <p style="font-size:12px; color:#718096; margin-top:4px;">
+            Beli kavling tanah strategis ini di tepi jalan kota. Setelah dibeli, kalian bisa mendirikan toko bersama, memajang aneka makanan & barang, serta menyewa karyawan bot!
+          </p>
+        </div>
+        <div style="background:#fff5f7; border:1px solid #fed7e2; border-radius:12px; padding:12px; margin-bottom:16px; font-size:13px; color:#702459;">
+          <div>💰 Harga Kavling: <strong>🪙 120 Koin</strong></div>
+          <div style="margin-top:4px;">🪙 Tabungan Keluarga Saat Ini: <strong id="buy-land-coins">100</strong> Koin</div>
+        </div>
+        <button class="btn-start" id="btn-confirm-buy-land" onclick="confirmBuyLand()">Beli Tanah & Bangun Toko 🚀</button>
+      </div>
+    </div>
+
+    <!-- ================= MODAL: KELOLA TOKO & SEWA KARYAWAN ================= -->
+    <div class="modal-overlay" id="modal-manage-store">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>🏪 Manajemen Toko Zahy & Aurel</h3>
+          <button class="btn-close" onclick="closeAllModals()">✕</button>
+        </div>
+
+        <div style="background:#ebf8ff; border:1px solid #bee3f8; border-radius:12px; padding:10px 14px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <div style="font-size:12px; font-weight:bold; color:#2b6cb0;">Pendapatan Toko Hari Ini:</div>
+            <div style="font-size:16px; font-weight:bold; color:#2c5282;">🪙 <span id="store-daily-revenue">0</span> Koin</div>
+          </div>
+          <div>
+            <div style="font-size:11px; color:#4a5568;">Total Pengunjung: <strong id="store-visitor-count">0</strong></div>
+            <div style="font-size:11px; color:#4a5568;">Level Toko: <strong id="store-level-badge">1 (Minimarket)</strong></div>
+          </div>
+        </div>
+
+        <h4 style="font-size:13px; color:#4a5568; margin-bottom:8px;">👥 Sewa Pegawai Bot Toko:</h4>
+        <div class="item-grid" style="grid-template-columns: 1fr 1fr; margin-bottom:14px;">
+          <div class="item-card" style="text-align:left; padding:10px;">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+              <span style="font-size:26px;">👩‍💼</span>
+              <div>
+                <div style="font-size:12px; font-weight:bold;">Rani (Kasir)</div>
+                <div style="font-size:10px; color:#718096;">Gaji: 🪙 25 Koin</div>
+              </div>
+            </div>
+            <p style="font-size:10px; color:#718096; margin-bottom:8px;">Melayani pembeli otomatis di kasir, mempercepat penjualan toko +50%.</p>
+            <button class="btn-item-action" id="btn-hire-rani" onclick="hireEmployee('rani', 25)">Sewa Rani</button>
+          </div>
+
+          <div class="item-card" style="text-align:left; padding:10px;">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+              <span style="font-size:26px;">🧑‍💼</span>
+              <div>
+                <div style="font-size:12px; font-weight:bold;">Doni (Pramuniaga)</div>
+                <div style="font-size:10px; color:#718096;">Gaji: 🪙 30 Koin</div>
+              </div>
+            </div>
+            <p style="font-size:10px; color:#718096; margin-bottom:8px;">Menata rak display dan menyapa pembeli (+Love Points setiap transaksi).</p>
+            <button class="btn-item-action" id="btn-hire-doni" onclick="hireEmployee('doni', 30)">Sewa Doni</button>
+          </div>
+        </div>
+
+        <h4 style="font-size:13px; color:#4a5568; margin-bottom:8px;">📦 Pajang Makanan di Rak Display Toko:</h4>
+        <p style="font-size:11px; color:#a0aec0; margin-bottom:8px;">Pilih makanan dari kulkas untuk dipajang dan dijual ke warga kota.</p>
+        <div class="item-grid" id="store-stock-grid"></div>
+      </div>
+    </div>
+
+    <!-- ================= MODAL: AIR MANCUR HARAPAN KOTA ================= -->
+    <div class="modal-overlay" id="modal-fountain">
+      <div class="modal-content" style="text-align:center;">
+        <div class="modal-header">
+          <h3>⛲ Air Mancur Harapan Cinta</h3>
+          <button class="btn-close" onclick="closeAllModals()">✕</button>
+        </div>
+        <span style="font-size:52px; display:block; margin:10px 0;">⛲✨</span>
+        <p style="font-size:13px; color:#4a5568; margin-bottom:14px;">
+          Legenda kota mengatakan, siapa pun pasangan yang melemparkan koin ke dalam air mancur ini akan dipenuhi rasa cinta yang abadi!
+        </p>
+        <button class="btn-start" onclick="makeFountainWish()">Lempar 1 Koin Cinta (🪙 1) 💫</button>
       </div>
     </div>
 
