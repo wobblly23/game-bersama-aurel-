@@ -20,28 +20,50 @@ const worldWidth = 2400;
 const worldHeight = 1600;
 const camera = { x: 0, y: 0 };
 
-// Preload Kenney Visual Assets
-const assetImgs = {};
-function getAsset(name, src) {
-  if (!assetImgs[name]) {
+// ================= 2D KENNEY RETRO PIXEL ART ENGINE =================
+ctx.imageSmoothingEnabled = false;
+
+// 2D Pixel Tile Cache from asset2 packs (tiny-town, tiny-farm, tiny-city)
+const tileCache = {};
+function get2DTile(pack, index) {
+  const pad = String(index).padStart(4, '0');
+  const key = `${pack}_${pad}`;
+  if (!tileCache[key]) {
     const img = new Image();
-    img.src = src;
-    assetImgs[name] = img;
+    img.src = `asset2/${pack}/Tiles/tile_${pad}.png`;
+    // Fallback if served under assets2/
+    img.onerror = () => {
+      if (!img.src.includes('assets2/')) {
+        img.src = `assets2/${pack}/Tiles/tile_${pad}.png`;
+      }
+    };
+    tileCache[key] = img;
   }
-  return assetImgs[name];
+  return tileCache[key];
 }
 
-// Preload core assets
-getAsset('bldg_a', 'assets/city_building-a.png');
-getAsset('bldg_b', 'assets/city_building-b.png');
-getAsset('bldg_c', 'assets/city_building-c.png');
-getAsset('bldg_d', 'assets/city_building-d.png');
-getAsset('cash_reg', 'assets/shop_cash-register.png');
-getAsset('disp_fruit', 'assets/shop_display-fruit.png');
-getAsset('disp_bread', 'assets/shop_display-bread.png');
-getAsset('clothing_rack', 'assets/shop_clothing-rack.png');
-getAsset('employee', 'assets/shop_character-employee.png');
-getAsset('bridge', 'assets/forest_bridge.png');
+function drawTile(pack, index, x, y, w = 32, h = 32, flipX = false) {
+  const img = get2DTile(pack, index);
+  if (img && img.complete && img.naturalWidth > 0) {
+    if (flipX) {
+      ctx.save();
+      ctx.translate(x + w, y);
+      ctx.scale(-1, 1);
+      ctx.drawImage(img, 0, 0, w, h);
+      ctx.restore();
+    } else {
+      ctx.drawImage(img, x, y, w, h);
+    }
+    return true;
+  }
+  return false;
+}
+
+// Preload essential 2D character, nature, and building tiles
+[0, 25, 36, 37, 48, 60, 66, 67, 68, 69, 70, 72, 73, 78, 79, 80, 81, 85, 86, 96, 97, 98, 99, 100, 101, 102, 103, 109, 113].forEach(i => get2DTile('tiny-town', i));
+[0, 2, 24, 26, 36, 48, 49, 80, 81, 82, 84, 116, 117].forEach(i => get2DTile('tiny-farm', i));
+[12, 13, 24, 36, 38, 40, 42, 48, 72, 84, 85].forEach(i => get2DTile('tiny-city', i));
+
 
 // Solid World Collision Boxes across 2400x1600
 const solidColliders = [
@@ -1518,80 +1540,67 @@ requestAnimationFrame(loop);
 
 // ================= ENVIRONMENT DETAILS =================
 function drawEnvironment() {
-  // Vibrant grass background across entire 2400x1600 world!
+  // Vibrant 2D grass background
   ctx.fillStyle = '#659b5e';
   ctx.fillRect(0, 0, worldWidth, worldHeight);
 
-  // Decorative grass textures & tufts
-  ctx.fillStyle = '#5c9255';
-  for (let gx = 60; gx < worldWidth; gx += 160) {
-    for (let gy = 60; gy < worldHeight; gy += 140) {
-      ctx.fillRect(gx + (gy % 50), gy, 10, 4);
-      ctx.fillRect(gx + (gy % 50) + 3, gy - 3, 4, 9);
+  // Decorative grass tiles & tufts from Kenney tiny-town
+  for (let gx = 0; gx < worldWidth; gx += 32) {
+    for (let gy = 0; gy < worldHeight; gy += 32) {
+      if ((gx * 7 + gy * 13) % 97 === 0) {
+        drawTile('tiny-town', 1, gx, gy, 32, 32);
+      } else if ((gx * 3 + gy * 17) % 131 === 0) {
+        drawTile('tiny-town', 2, gx, gy, 32, 32);
+      }
     }
   }
 
   // ================= MAIN ROADS & BOULEVARDS =================
   // 1. Grand East-West Boulevard (Connecting Home, Store, Plaza & Forest)
-  ctx.fillStyle = '#c5a074';
-  ctx.fillRect(200, 680, 2000, 52); // Main Boulevard
-  ctx.fillStyle = '#b38d60';
-  ctx.fillRect(200, 676, 2000, 4);  // Road border top
-  ctx.fillRect(200, 732, 2000, 4);  // Road border bottom
+  for (let rx = 200; rx < 2200; rx += 32) {
+    drawTile('tiny-town', 25, rx, 680, 32, 32);
+    drawTile('tiny-town', 25, rx, 712, 32, 32);
+  }
 
   // 2. Cobblestone / Dirt Path connecting Home, Garden, Pond, and Shop
-  ctx.fillStyle = '#d4b28c';
-  // Path from house door down to main boulevard
-  ctx.fillRect(415, 290, 40, 400);
-  // Path branching to farm
-  ctx.fillRect(360, 520, 190, 30);
-  // Path branching to cafe & pond
-  ctx.fillRect(455, 340, 200, 30);
-  ctx.fillRect(630, 340, 30, 350);
-  ctx.fillRect(630, 520, 100, 30);
-  // Path branching to store plot
-  ctx.fillRect(455, 210, 580, 28);
-  // Path connecting store entrance down to Main Boulevard
-  ctx.fillRect(1140, 420, 40, 270);
+  for (let py = 280; py < 680; py += 32) {
+    drawTile('tiny-town', 25, 416, py, 32, 32);
+  }
+  for (let px = 352; px < 544; px += 32) {
+    drawTile('tiny-town', 25, px, 520, 32, 32);
+  }
+  for (let px = 448; px < 640; px += 32) {
+    drawTile('tiny-town', 25, px, 340, 32, 32);
+  }
+  for (let py = 340; py < 680; py += 32) {
+    drawTile('tiny-town', 25, 630, py, 32, 32);
+  }
+  for (let px = 630; px < 730; px += 32) {
+    drawTile('tiny-town', 25, px, 520, 32, 32);
+  }
+  for (let px = 448; px < 1030; px += 32) {
+    drawTile('tiny-town', 25, px, 210, 32, 32);
+  }
+  for (let py = 420; py < 680; py += 32) {
+    drawTile('tiny-town', 25, 1140, py, 32, 32);
+  }
 
   // 3. Grand Downtown Boulevard from East-West Boulevard down to Downtown Plaza
-  ctx.fillStyle = '#94a3b8'; // Stone paved city avenue
-  ctx.fillRect(1150, 732, 100, 160);
-  ctx.fillStyle = '#cbd5e1';
-  // Decorative road center dashed line
-  ctx.strokeStyle = '#ffffff';
-  ctx.lineWidth = 3;
-  ctx.setLineDash([12, 12]);
-  ctx.beginPath();
-  ctx.moveTo(1200, 740);
-  ctx.lineTo(1200, 890);
-  ctx.stroke();
-  ctx.setLineDash([]);
+  for (let py = 732; py < 880; py += 32) {
+    for (let px = 1152; px < 1248; px += 32) {
+      drawTile('tiny-city', 12, px, py, 32, 32);
+    }
+  }
 
-  // Decorative Little Flowers & Bushes across districts
+  // Decorative Little Flowers
   const flowerPositions = [
-    { x: 120, y: 380, color: '#ff6584' },
-    { x: 150, y: 410, color: '#ffbe76' },
-    { x: 190, y: 360, color: '#f8a5c2' },
-    { x: 280, y: 580, color: '#ff6584' },
-    { x: 570, y: 640, color: '#f8a5c2' },
-    { x: 880, y: 380, color: '#ffbe76' },
-    { x: 950, y: 240, color: '#ff6584' },
-    { x: 1330, y: 230, color: '#f8a5c2' },
-    { x: 1050, y: 640, color: '#ffbe76' },
-    { x: 1350, y: 640, color: '#ff6584' },
-    { x: 1680, y: 620, color: '#f8a5c2' },
-    { x: 1720, y: 760, color: '#ffbe76' }
+    { x: 120, y: 380 }, { x: 150, y: 410 }, { x: 190, y: 360 },
+    { x: 280, y: 580 }, { x: 570, y: 640 }, { x: 880, y: 380 },
+    { x: 950, y: 240 }, { x: 1330, y: 230 }, { x: 1050, y: 640 },
+    { x: 1350, y: 640 }, { x: 1680, y: 620 }, { x: 1720, y: 760 }
   ];
   flowerPositions.forEach(f => {
-    ctx.fillStyle = f.color;
-    ctx.beginPath();
-    ctx.arc(f.x, f.y, 4, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#fff';
-    ctx.beginPath();
-    ctx.arc(f.x, f.y, 1.5, 0, Math.PI * 2);
-    ctx.fill();
+    drawTile('tiny-town', 1, f.x - 8, f.y - 8, 20, 20);
   });
 
   // Trees near home and roads
@@ -1603,18 +1612,14 @@ function drawEnvironment() {
 }
 
 function drawTree(x, y) {
-  // Trunk
-  ctx.fillStyle = '#795548';
-  ctx.fillRect(x - 8, y, 16, 30);
-  // Leaves
-  ctx.fillStyle = '#2e7d32';
-  ctx.beginPath();
-  ctx.arc(x, y - 8, 30, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = '#388e3c';
-  ctx.beginPath();
-  ctx.arc(x - 6, y - 14, 20, 0, Math.PI * 2);
-  ctx.fill();
+  if (!drawTile('tiny-town', 48, x - 18, y - 36, 40, 48)) {
+    ctx.fillStyle = '#795548';
+    ctx.fillRect(x - 8, y, 16, 30);
+    ctx.fillStyle = '#2e7d32';
+    ctx.beginPath();
+    ctx.arc(x, y - 8, 30, 0, Math.PI * 2);
+    ctx.fill();
+  }
 }
 
 function drawHouse() {
@@ -1623,141 +1628,100 @@ function drawHouse() {
   const hw = 310;
   const hh = 210;
 
-  // Outdoor house shadow
+  // Outdoor shadow
   ctx.fillStyle = 'rgba(0,0,0,0.18)';
   ctx.fillRect(hx - 5, hy + hh - 5, hw + 10, 15);
 
-  // House Floor (Wood planks)
-  ctx.fillStyle = '#e0a96d';
-  ctx.fillRect(hx, hy, hw, hh);
-
-  // Floor plank lines
-  ctx.strokeStyle = '#c48b53';
-  ctx.lineWidth = 1;
-  for (let y = hy + 20; y < hy + hh; y += 20) {
-    ctx.beginPath();
-    ctx.moveTo(hx, y);
-    ctx.lineTo(hx + hw, y);
-    ctx.stroke();
+  // House Floor: 2D Wood Floor Tiles (tiny-town tile 72)
+  for (let fx = hx; fx < hx + hw; fx += 32) {
+    for (let fy = hy + 24; fy < hy + hh; fy += 32) {
+      drawTile('tiny-town', 72, fx, fy, 32, 32);
+    }
   }
 
-  // House Walls (North, West, East)
-  ctx.fillStyle = '#8d5b4c';
-  ctx.fillRect(hx, hy, hw, 26); // North wall
-  ctx.fillRect(hx, hy, 16, hh); // West wall
-  ctx.fillRect(hx + hw - 16, hy, 16, hh); // East wall
-  // South walls leaving door open in middle
-  ctx.fillRect(hx, hy + hh - 16, 120, 16);
-  ctx.fillRect(hx + hw - 150, hy + hh - 16, 150, 16);
+  // House Walls (tiny-town tile 73)
+  for (let wx = hx; wx < hx + hw; wx += 32) {
+    drawTile('tiny-town', 73, wx, hy, 32, 28);
+  }
+  for (let wy = hy; wy < hy + hh; wy += 32) {
+    drawTile('tiny-town', 73, hx, wy, 20, 32);
+    drawTile('tiny-town', 73, hx + hw - 20, wy, 20, 32);
+  }
+  // South wall leaving doorway at 415..455
+  for (let wx = hx; wx < 415; wx += 32) {
+    drawTile('tiny-town', 73, wx, hy + hh - 20, 32, 20);
+  }
+  for (let wx = 455; wx < hx + hw; wx += 32) {
+    drawTile('tiny-town', 73, wx, hy + hh - 20, 32, 20);
+  }
 
-  // Door welcome mat (with sweet heart)
-  ctx.fillStyle = '#ff7597';
-  ctx.fillRect(415, hy + hh - 12, 40, 16);
-  ctx.font = '10px sans-serif';
-  ctx.fillStyle = '#fff';
-  ctx.fillText('❤️', 429, hy + hh);
+  // Door tile (tiny-town 85)
+  drawTile('tiny-town', 85, 415, hy + hh - 24, 36, 28);
 
-  // Roof aesthetic ridge at top
-  ctx.fillStyle = '#a64d3d';
-  ctx.fillRect(hx - 10, hy - 14, hw + 20, 18);
+  // Roof ridge (tiny-town tiles 36, 37, 38)
+  for (let rx = hx - 16; rx < hx + hw + 16; rx += 32) {
+    drawTile('tiny-town', 37, rx, hy - 16, 32, 24);
+  }
 
-  // ============ FURNITURE INSIDE ============
-  // 1. Double Couple Bed (x: 375, y: 110)
-  ctx.fillStyle = '#d4a373';
-  ctx.fillRect(375, 110, 75, 65); // Bed frame
-  ctx.fillStyle = '#fff0f3';
-  ctx.fillRect(380, 130, 65, 42); // Blanket
-  // Two cozy pillows
-  ctx.fillStyle = '#ffb3c1';
-  ctx.fillRect(384, 114, 26, 14);
-  ctx.fillRect(414, 114, 26, 14);
-  // Bed heart tag
+  // ============ FURNITURE INSIDE (2D TILES) ============
+  // 1. Bed (tiny-town tile 66)
+  drawTile('tiny-town', 66, 380, 110, 48, 48);
   ctx.font = '12px sans-serif';
-  ctx.fillText('❤️', 407, 155);
+  ctx.fillText('❤️', 398, 140);
 
-  // 2. Kitchen Stove (x: 475, y: 110)
-  ctx.fillStyle = '#4a5568';
-  ctx.fillRect(475, 110, 40, 45);
-  ctx.fillStyle = '#e2e8f0';
-  ctx.fillRect(478, 113, 34, 16); // Stove top
-  ctx.fillStyle = '#ff4757';
-  ctx.beginPath();
-  ctx.arc(487, 121, 4, 0, Math.PI * 2);
-  ctx.arc(503, 121, 4, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.font = '12px sans-serif';
-  ctx.fillText('🍳', 488, 145);
+  // 2. Kitchen Stove (tiny-town tile 70)
+  drawTile('tiny-town', 70, 480, 110, 36, 36);
 
-  // 3. Fridge (x: 525, y: 110)
-  ctx.fillStyle = '#cbd5e0';
-  ctx.fillRect(525, 108, 34, 50);
-  ctx.fillStyle = '#718096';
-  ctx.fillRect(529, 124, 4, 16); // Handle
-  ctx.font = '12px sans-serif';
-  ctx.fillText('🧊', 533, 145);
+  // 3. Fridge / Cupboard (tiny-town tile 69)
+  drawTile('tiny-town', 69, 526, 110, 36, 40);
 
-  // 4. Love Board on Wall (x: 310, y: 110)
+  // 4. Dining Table & Chairs (tiny-town 67 table, 68 chair)
+  drawTile('tiny-town', 68, 305, 185, 24, 28);
+  drawTile('tiny-town', 67, 330, 185, 32, 32);
+  drawTile('tiny-town', 68, 362, 185, 24, 28, true);
+
+  // 5. Love Board on Wall (x: 310, y: 110)
   ctx.fillStyle = '#ffeaa7';
-  ctx.fillRect(310, 110, 48, 36);
+  ctx.fillRect(310, 110, 48, 34);
   ctx.strokeStyle = '#d63031';
-  ctx.strokeRect(310, 110, 48, 36);
-  ctx.font = '11px sans-serif';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(310, 110, 48, 34);
+  ctx.font = 'bold 10px sans-serif';
   ctx.fillStyle = '#d63031';
-  ctx.fillText('💌 PESAN', 314, 125);
-  ctx.fillText('CINTA', 320, 138);
-
-  // 5. Dining Table & 2 Chairs
-  ctx.fillStyle = '#8d5b4c';
-  ctx.fillRect(320, 185, 45, 30);
-  ctx.fillStyle = '#fff';
-  ctx.beginPath();
-  ctx.arc(342, 200, 6, 0, Math.PI * 2); // Tea cup
-  ctx.fill();
+  ctx.textAlign = 'center';
+  ctx.fillText('💌 PESAN', 334, 124);
+  ctx.fillText('CINTA', 334, 137);
 }
 
 function drawFarmingPlots() {
   farmingPlots.forEach(plot => {
-    // Soil
-    if (plot.state === 'empty') {
-      ctx.fillStyle = '#8c6239';
-    } else if (plot.state === 'tilled') {
-      ctx.fillStyle = '#5c3d1e';
-    } else if (plot.state === 'watered' || plot.state === 'ready') {
-      ctx.fillStyle = '#3d2511'; // Wet dark soil
-    } else {
-      ctx.fillStyle = '#6e4722';
-    }
-
-    ctx.fillRect(plot.x, plot.y, 42, 42);
-    ctx.strokeStyle = '#4a2f15';
-    ctx.strokeRect(plot.x, plot.y, 42, 42);
+    // Soil Tile: empty = 0, tilled = 2, watered/ready = 26 from tiny-farm
+    const soilTile = (plot.state === 'empty') ? 0 : (plot.state === 'tilled' ? 2 : 26);
+    drawTile('tiny-farm', soilTile, plot.x, plot.y, 42, 42);
 
     // Crops
     if (plot.cropType) {
       if (plot.state === 'ready') {
-        ctx.font = '24px sans-serif';
-        const icon = plot.cropType === 'strawberry' ? '🍓' : '🥕';
-        ctx.fillText(icon, plot.x + 8, plot.y + 30);
+        const cropTile = plot.cropType === 'strawberry' ? 48 : 49;
+        drawTile('tiny-farm', cropTile, plot.x + 5, plot.y + 5, 32, 32);
       } else {
-        // Growing sprout
-        ctx.fillStyle = '#48bb78';
-        const h = Math.max(6, (plot.growthProgress / 100) * 22);
-        ctx.fillRect(plot.x + 19, plot.y + 36 - h, 4, h);
-        ctx.beginPath();
-        ctx.arc(plot.x + 21, plot.y + 34 - h, 6, 0, Math.PI * 2);
-        ctx.fill();
+        const cropTile = (plot.growthProgress < 50) ? 24 : 36;
+        drawTile('tiny-farm', cropTile, plot.x + 5, plot.y + 5, 32, 32);
       }
     }
   });
 
-  // Garden sign
-  ctx.fillStyle = '#8d5b4c';
-  ctx.fillRect(330, 560, 6, 24);
-  ctx.fillStyle = '#ffbe76';
-  ctx.fillRect(315, 546, 38, 16);
+  // Garden picket fences (tiny-farm 84)
+  for (let fx = 180; fx <= 360; fx += 32) {
+    drawTile('tiny-farm', 84, fx, 490, 32, 24);
+  }
+
+  // Garden sign (tiny-town 83)
+  drawTile('tiny-town', 83, 320, 546, 28, 28);
   ctx.font = 'bold 9px sans-serif';
-  ctx.fillStyle = '#333';
-  ctx.fillText('KEBUN', 319, 558);
+  ctx.fillStyle = '#fff';
+  ctx.textAlign = 'center';
+  ctx.fillText('KEBUN', 334, 542);
 }
 
 function drawPond() {
@@ -1766,25 +1730,23 @@ function drawPond() {
   const pw = 160;
   const ph = 100;
 
-  // Pond water
-  ctx.fillStyle = '#4299e1';
-  ctx.beginPath();
-  ctx.ellipse(px + pw / 2, py + ph / 2, pw / 2, ph / 2, 0, 0, Math.PI * 2);
-  ctx.fill();
+  // Pond water tiles from tiny-town 109
+  for (let x = px; x < px + pw; x += 32) {
+    for (let y = py; y < py + ph; y += 32) {
+      drawTile('tiny-town', 109, x, y, 32, 32);
+    }
+  }
 
-  // Water shine / ripples
+  // Ripples
   ctx.strokeStyle = 'rgba(255,255,255,0.4)';
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.arc(px + 60, py + 40, 20, 0, Math.PI * 0.8);
   ctx.stroke();
 
-  // Wooden dock / pier
-  ctx.fillStyle = '#a0522d';
-  ctx.fillRect(px - 15, py + 35, 45, 30);
-  ctx.fillStyle = '#8b4513';
-  ctx.fillRect(px - 15, py + 35, 6, 30);
-  ctx.fillRect(px + 24, py + 35, 6, 30);
+  // Wooden dock / pier tiles (tiny-town 78, 79, 80)
+  drawTile('tiny-town', 78, px - 15, py + 35, 32, 30);
+  drawTile('tiny-town', 79, px + 17, py + 35, 32, 30);
 
   // Fishing rod sign
   ctx.font = '16px sans-serif';
@@ -1795,9 +1757,9 @@ function drawCafeStand() {
   const sx = 620;
   const sy = 320;
 
-  // Wooden stall
-  ctx.fillStyle = '#a67c52';
-  ctx.fillRect(sx, sy, 70, 45);
+  // Wooden stall structure using tiny-town tiles
+  drawTile('tiny-town', 72, sx, sy + 15, 36, 30);
+  drawTile('tiny-town', 72, sx + 34, sy + 15, 36, 30);
 
   // Striped awning (Pink & White)
   ctx.fillStyle = '#ff6584';
@@ -1816,150 +1778,56 @@ function drawCafeStand() {
 }
 
 function drawNPCs() {
-  // Draw all living animated NPCs & pets
+  // Draw all living animated NPCs & pets using Kenney 2D tiles
   npcs.forEach(npc => {
     ctx.save();
     ctx.translate(npc.x, npc.y);
 
-    const bob = npc.anim === 'walk' ? Math.sin(Date.now() * 0.015) * 2 : 0;
+    const bob = npc.anim === 'walk' ? Math.sin(Date.now() * 0.015) * 3 : 0;
+    const isLeft = npc.dir === 'left';
 
     // Shadow
     ctx.fillStyle = 'rgba(0,0,0,0.18)';
     ctx.beginPath();
-    ctx.ellipse(0, 16, npc.isPet ? 10 : 12, npc.isPet ? 5 : 6, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, 14, npc.isPet ? 10 : 12, npc.isPet ? 5 : 6, 0, 0, Math.PI * 2);
     ctx.fill();
 
     if (npc.isPet) {
-      // ===== DRAW MIMI THE ORANGE CAT =====
-      // Tail wagging
-      const tailWag = Math.sin(Date.now() * 0.008) * 0.4;
-      ctx.strokeStyle = '#e67e22';
-      ctx.lineWidth = 3.5;
-      ctx.beginPath();
-      ctx.moveTo(-10, 4);
-      ctx.quadraticCurveTo(-18, 0 + tailWag * 10, -16, -10 + tailWag * 6);
-      ctx.stroke();
-
-      // Cat Body (Orange tabby)
-      ctx.fillStyle = '#f39c12';
-      ctx.beginPath();
-      ctx.ellipse(0, 4 + bob, 14, 10, 0, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Tabby stripes
-      ctx.fillStyle = '#d35400';
-      ctx.fillRect(-4, 0 + bob, 2.5, 8);
-      ctx.fillRect(2, 0 + bob, 2.5, 8);
-
-      // Paws
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath();
-      ctx.arc(-8, 12, 3, 0, Math.PI * 2);
-      ctx.arc(8, 12, 3, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Cat Head
-      ctx.fillStyle = '#f39c12';
-      ctx.beginPath();
-      ctx.arc(0, -6 + bob, 9, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Pointy Ears
-      ctx.fillStyle = '#d35400';
-      ctx.beginPath();
-      ctx.moveTo(-7, -13 + bob);
-      ctx.lineTo(-3, -20 + bob);
-      ctx.lineTo(0, -13 + bob);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.moveTo(1, -13 + bob);
-      ctx.lineTo(5, -20 + bob);
-      ctx.lineTo(8, -13 + bob);
-      ctx.fill();
-
-      // Eyes & Pink Nose
-      ctx.fillStyle = '#2c3e50';
-      ctx.fillRect(-4, -8 + bob, 2, 2.5);
-      ctx.fillRect(3, -8 + bob, 2, 2.5);
-      ctx.fillStyle = '#ff7597';
-      ctx.beginPath();
-      ctx.arc(0, -4 + bob, 1.5, 0, Math.PI * 2);
-      ctx.fill();
+      // ===== DRAW MIMI THE ORANGE CAT (tiny-town 113) =====
+      if (!drawTile('tiny-town', 113, -16, -24 + bob, 32, 32, isLeft)) {
+        ctx.fillStyle = '#f39c12';
+        ctx.beginPath();
+        ctx.ellipse(0, 4 + bob, 14, 10, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
 
       // Pet Name Tag
       ctx.font = 'bold 10px "Segoe UI", sans-serif';
       ctx.textAlign = 'center';
       ctx.fillStyle = 'rgba(0,0,0,0.6)';
-      ctx.fillRect(-22, -32 + bob, 44, 14);
+      ctx.fillRect(-22, -34 + bob, 44, 14);
       ctx.fillStyle = '#fff';
-      ctx.fillText('Mimi 🐱', 0, -22 + bob);
+      ctx.fillText('Mimi 🐱', 0, -24 + bob);
 
     } else {
-      // ===== DRAW HUMANOID NPCS =====
-      // Legs
-      ctx.fillStyle = '#2d3748';
-      ctx.fillRect(-5, 8 + bob, 3.5, 9);
-      ctx.fillRect(2, 8 - bob, 3.5, 9);
+      // ===== DRAW HUMANOID NPCS WITH KENNEY 2D TILES =====
+      let tileIndex = 103; // Default citizen
+      if (npc.id === 'joko') tileIndex = 98;        // Farmer
+      else if (npc.id === 'sri') tileIndex = 99;    // Chef / Merchant
+      else if (npc.id === 'somad') tileIndex = 100; // Elder
+      else if (npc.id === 'mandor' || npc.id === 'pak_rt') tileIndex = 101; // Worker/Mandor
+      else if (npc.id === 'rani') tileIndex = 102;  // Cashier
+      else if (npc.id === 'rina') tileIndex = 97;   // Girl
+      else if (npc.id === 'bayu' || npc.id === 'doni') tileIndex = 96; // Boy
 
-      // Body / Clothes
-      ctx.fillStyle = npc.color;
-      ctx.fillRect(-9, -8 + bob, 18, 16);
-
-      // Special Accessories
-      if (npc.id === 'sri') {
-        // Apron
-        ctx.fillStyle = '#fff0f3';
-        ctx.fillRect(-6, -4 + bob, 12, 12);
-      } else if (npc.id === 'somad') {
-        // Walking cane
-        ctx.strokeStyle = '#795548';
-        ctx.lineWidth = 2.5;
+      if (!drawTile('tiny-town', tileIndex, -16, -28 + bob, 32, 32, isLeft)) {
+        ctx.fillStyle = npc.color || '#4299e1';
+        ctx.fillRect(-9, -8 + bob, 18, 16);
+        ctx.fillStyle = '#ffe0bd';
         ctx.beginPath();
-        ctx.moveTo(11, -2 + bob);
-        ctx.lineTo(13, 16);
-        ctx.stroke();
-      }
-
-      // Head
-      ctx.fillStyle = npc.id === 'somad' ? '#f7d7b5' : '#ffe0bd';
-      ctx.beginPath();
-      ctx.arc(0, -16 + bob, 10, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Hair / Hat / Beard
-      if (npc.id === 'joko') {
-        // Straw Hat
-        ctx.fillStyle = '#e0a96d';
-        ctx.beginPath();
-        ctx.ellipse(0, -23 + bob, 15, 5, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(0, -25 + bob, 8, Math.PI, Math.PI * 2);
-        ctx.fill();
-      } else if (npc.id === 'somad') {
-        // White hair & elder beard
-        ctx.fillStyle = '#e2e8f0';
-        ctx.beginPath();
-        ctx.arc(0, -20 + bob, 11, Math.PI, Math.PI * 2);
-        ctx.fill();
-        // Beard
-        ctx.beginPath();
-        ctx.moveTo(-5, -12 + bob);
-        ctx.lineTo(0, -4 + bob);
-        ctx.lineTo(5, -12 + bob);
-        ctx.fill();
-      } else {
-        // Hair
-        ctx.fillStyle = '#4a3728';
-        ctx.beginPath();
-        ctx.arc(0, -20 + bob, 10, Math.PI, Math.PI * 2);
+        ctx.arc(0, -16 + bob, 10, 0, Math.PI * 2);
         ctx.fill();
       }
-
-      // Friendly Eyes
-      ctx.fillStyle = '#2d3748';
-      ctx.fillRect(-4, -17 + bob, 2, 3);
-      ctx.fillRect(2, -17 + bob, 2, 3);
 
       // Name & Role Tag
       ctx.font = 'bold 10px "Segoe UI", sans-serif';
@@ -1967,22 +1835,20 @@ function drawNPCs() {
       const tagText = `${npc.name}`;
       const tagWidth = ctx.measureText(tagText).width;
       ctx.fillStyle = 'rgba(0,0,0,0.65)';
-      ctx.fillRect(-tagWidth / 2 - 4, -40 + bob, tagWidth + 8, 15);
+      ctx.fillRect(-tagWidth / 2 - 4, -42 + bob, tagWidth + 8, 15);
       ctx.fillStyle = '#fbd38d';
-      ctx.fillText(tagText, 0, -29 + bob);
+      ctx.fillText(tagText, 0, -31 + bob);
     }
 
     ctx.restore();
   });
 
-  // Shop Building Decoration
-  ctx.fillStyle = '#b7791f';
-  ctx.fillRect(730, 80, 85, 45);
-  ctx.fillStyle = '#d69e2e';
-  ctx.fillRect(725, 68, 95, 14);
+  // Shop Building Decoration (tiny-town 36 & 85)
+  drawTile('tiny-town', 36, 740, 60, 48, 48);
+  drawTile('tiny-town', 85, 752, 90, 24, 28);
   ctx.font = 'bold 10px sans-serif';
   ctx.fillStyle = '#fff';
-  ctx.fillText('TOKO TANI', 742, 105);
+  ctx.fillText('TOKO TANI', 742, 56);
 }
 
 function drawHandHoldingLink() {
@@ -2026,53 +1892,24 @@ function drawPlayer(p) {
   const bob = p.anim === 'walk' ? Math.sin(Date.now() * 0.015) * 2.5 : 0;
 
   // Shadow
-  ctx.fillStyle = 'rgba(0,0,0,0.2)';
+  ctx.fillStyle = 'rgba(0,0,0,0.22)';
   ctx.beginPath();
-  ctx.ellipse(0, 18, 12, 6, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, 12, 11, 5, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Legs
-  ctx.fillStyle = '#2d3748';
-  ctx.fillRect(-6, 8 + bob, 4, 10);
-  ctx.fillRect(2, 8 - bob, 4, 10);
+  // Draw 2D Kenney Pixel Character from tiny-town
+  // Tile 96 = Male Villager (Zahy), Tile 97 = Female Villager (Aurel)
+  const charTile = p.gender === 'boy' ? 96 : 97;
+  const flip = p.dir === 'left';
+  const drawn = drawTile('tiny-town', charTile, -16, -26 + bob, 32, 32, flip);
 
-  // Body / Outfit
-  ctx.fillStyle = p.color || (p.gender === 'boy' ? '#4a90e2' : '#ff6584');
-  ctx.fillRect(-10, -8 + bob, 20, 16);
-
-  // Head & Skin
-  ctx.fillStyle = '#ffe0bd';
-  ctx.beginPath();
-  ctx.arc(0, -16 + bob, 12, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Cheerful Blush cheeks
-  ctx.fillStyle = 'rgba(255, 105, 132, 0.45)';
-  ctx.beginPath();
-  ctx.arc(-7, -13 + bob, 2.5, 0, Math.PI * 2);
-  ctx.arc(7, -13 + bob, 2.5, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Eyes
-  ctx.fillStyle = '#2d3748';
-  ctx.fillRect(-5, -17 + bob, 2, 4);
-  ctx.fillRect(3, -17 + bob, 2, 4);
-
-  // Hair Style (Boy vs Girl)
-  ctx.fillStyle = p.gender === 'boy' ? '#4a3728' : '#6b4226';
-  if (p.gender === 'boy') {
+  if (!drawn) {
+    // Fallback while loading
+    ctx.fillStyle = p.gender === 'boy' ? '#4a90e2' : '#ff6584';
+    ctx.fillRect(-10, -8 + bob, 20, 16);
+    ctx.fillStyle = '#ffe0bd';
     ctx.beginPath();
-    ctx.arc(0, -22 + bob, 12, Math.PI, Math.PI * 2);
-    ctx.fill();
-  } else {
-    ctx.beginPath();
-    ctx.arc(0, -22 + bob, 13, Math.PI, Math.PI * 2);
-    ctx.fill();
-    ctx.fillRect(-14, -20 + bob, 4, 14);
-    ctx.fillRect(10, -20 + bob, 4, 14);
-    ctx.fillStyle = '#ff6584';
-    ctx.beginPath();
-    ctx.arc(9, -23 + bob, 3, 0, Math.PI * 2);
+    ctx.arc(0, -16 + bob, 12, 0, Math.PI * 2);
     ctx.fill();
   }
 
@@ -2241,73 +2078,47 @@ function drawBusinessPlotAndStore() {
 
   if (!store.owned) {
     // ===== KAVLING TANAH BELUM DIBELI =====
-    // Ground plot patch
-    ctx.fillStyle = '#8f7756';
-    ctx.fillRect(plotX, plotY, plotW, plotH);
-    ctx.fillStyle = '#a88d67';
-    ctx.fillRect(plotX + 6, plotY + 6, plotW - 12, plotH - 12);
-
-    // Grid lines (blueprint / land markers)
-    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
-    ctx.lineWidth = 1.5;
-    ctx.setLineDash([6, 6]);
-    for (let x = plotX + 30; x < plotX + plotW; x += 30) {
-      ctx.beginPath();
-      ctx.moveTo(x, plotY + 6);
-      ctx.lineTo(x, plotY + plotH - 6);
-      ctx.stroke();
+    // Ground plot patch with 2D dirt tiles (tiny-town 25)
+    for (let px = plotX; px < plotX + plotW; px += 32) {
+      for (let py = plotY; py < plotY + plotH; py += 32) {
+        drawTile('tiny-town', 25, px, py, 32, 32);
+      }
     }
-    for (let y = plotY + 30; y < plotY + plotH; y += 30) {
-      ctx.beginPath();
-      ctx.moveTo(plotX + 6, y);
-      ctx.lineTo(plotX + plotW - 6, y);
-      ctx.stroke();
+
+    // Boundary Fences (tiny-town 81)
+    for (let px = plotX; px < plotX + plotW; px += 32) {
+      drawTile('tiny-town', 81, px, plotY, 32, 24);
+      drawTile('tiny-town', 81, px, plotY + plotH - 24, 32, 24);
     }
-    ctx.setLineDash([]);
+    for (let py = plotY; py < plotY + plotH; py += 32) {
+      drawTile('tiny-town', 81, plotX, py, 20, 32);
+      drawTile('tiny-town', 81, plotX + plotW - 20, py, 20, 32);
+    }
 
-    // Corner Stakes with Red/White boundary ribbons
-    const corners = [
-      { x: plotX + 4, y: plotY + 4 },
-      { x: plotX + plotW - 4, y: plotY + 4 },
-      { x: plotX + 4, y: plotY + plotH - 4 },
-      { x: plotX + plotW - 4, y: plotY + plotH - 4 }
-    ];
-    corners.forEach(c => {
-      ctx.fillStyle = '#8d5b4c';
-      ctx.fillRect(c.x - 3, c.y - 14, 6, 18);
-      ctx.fillStyle = '#e53e3e';
-      ctx.beginPath();
-      ctx.arc(c.x, c.y - 15, 4, 0, Math.PI * 2);
-      ctx.fill();
-    });
+    // Signboard panel with 2D Sign (tiny-town 83)
+    drawTile('tiny-town', 83, 1145, 235, 40, 40);
 
-    // Big Construction Signboard (x: 1100, y: 260)
-    ctx.fillStyle = '#654321';
-    ctx.fillRect(1110, 275, 8, 45);
-    ctx.fillRect(1210, 275, 8, 45);
-
-    // Signboard panel
     ctx.fillStyle = '#fffdf7';
-    ctx.fillRect(1080, 240, 170, 75);
+    ctx.fillRect(1080, 260, 170, 68);
     ctx.strokeStyle = '#d97706';
     ctx.lineWidth = 3;
-    ctx.strokeRect(1080, 240, 170, 75);
+    ctx.strokeRect(1080, 260, 170, 68);
 
     ctx.font = 'bold 12px "Segoe UI", sans-serif';
     ctx.fillStyle = '#b45309';
     ctx.textAlign = 'center';
-    ctx.fillText('🏗️ KAVLING BISNIS', 1165, 258);
+    ctx.fillText('🏗️ KAVLING BISNIS', 1165, 276);
 
     ctx.font = 'bold 10px "Segoe UI", sans-serif';
     ctx.fillStyle = '#1e293b';
-    ctx.fillText('Tanah Toko Zahy & Aurel', 1165, 274);
+    ctx.fillText('Tanah Toko Zahy & Aurel', 1165, 292);
     ctx.font = '10px "Segoe UI", sans-serif';
     ctx.fillStyle = '#64748b';
-    ctx.fillText('Luas: 400m² • Harga: 🪙 120', 1165, 289);
+    ctx.fillText('Luas: 400m² • Harga: 🪙 120', 1165, 305);
 
     ctx.fillStyle = '#e11d48';
     ctx.font = 'bold 10px "Segoe UI", sans-serif';
-    ctx.fillText('Tekan [E] untuk Beli Tanah! ✨', 1165, 305);
+    ctx.fillText('Tekan [E] untuk Beli Tanah! ✨', 1165, 320);
 
   } else {
     // ===== TOKO SUDAH DIBANGUN (COUPLE MART) =====
@@ -2320,28 +2131,29 @@ function drawBusinessPlotAndStore() {
     ctx.fillStyle = 'rgba(0,0,0,0.18)';
     ctx.fillRect(bx - 6, by + bh - 6, bw + 12, 16);
 
-    // Floor (Checkered Peach & Ivory Tiles)
-    ctx.fillStyle = '#fff7ed';
-    ctx.fillRect(bx, by, bw, bh);
-    ctx.fillStyle = '#fed7aa';
-    const tileSize = 20;
-    for (let tx = bx; tx < bx + bw; tx += tileSize) {
-      for (let ty = by; ty < by + bh; ty += tileSize) {
-        if (((tx - bx) / tileSize + (ty - by) / tileSize) % 2 === 0) {
-          ctx.fillRect(tx, ty, Math.min(tileSize, bx + bw - tx), Math.min(tileSize, by + bh - ty));
-        }
+    // Commercial Checkered Floor (tiny-city 24 & 25)
+    for (let tx = bx; tx < bx + bw; tx += 32) {
+      for (let ty = by + 20; ty < by + bh; ty += 32) {
+        const tIdx = (((tx - bx) / 32 + (ty - by) / 32) % 2 === 0) ? 24 : 25;
+        drawTile('tiny-city', tIdx, tx, ty, 32, 32);
       }
     }
 
-    // Walls (North, West, East, South)
-    ctx.fillStyle = '#78350f';
-    ctx.fillRect(bx, by, bw, 22); // North
-    ctx.fillRect(bx, by, 16, bh); // West
-    ctx.fillRect(bx + bw - 16, by, 16, bh); // East
-
-    // South wall leaving door opening at x: 1130..1190
-    ctx.fillRect(bx, by + bh - 16, 1130 - bx, 16);
-    ctx.fillRect(1190, by + bh - 16, bx + bw - 1190, 16);
+    // Walls (tiny-city 36)
+    for (let wx = bx; wx < bx + bw; wx += 32) {
+      drawTile('tiny-city', 36, wx, by, 32, 28);
+    }
+    for (let wy = by; wy < by + bh; wy += 32) {
+      drawTile('tiny-city', 36, bx, wy, 20, 32);
+      drawTile('tiny-city', 36, bx + bw - 20, wy, 20, 32);
+    }
+    // South wall leaving door opening at 1130..1190
+    for (let wx = bx; wx < 1130; wx += 32) {
+      drawTile('tiny-city', 36, wx, by + bh - 20, 32, 20);
+    }
+    for (let wx = 1190; wx < bx + bw; wx += 32) {
+      drawTile('tiny-city', 36, wx, by + bh - 20, 32, 20);
+    }
 
     // Door Welcome Mat
     ctx.fillStyle = '#38a169';
@@ -2360,7 +2172,7 @@ function drawBusinessPlotAndStore() {
       ctx.fillRect(bx - 8 + i * 26, roofY, 13, 18);
     }
 
-    // 3D Signboard: TOKO ZAHY & AUREL
+    // 2D Signboard: TOKO ZAHY & AUREL
     ctx.fillStyle = '#1e293b';
     ctx.fillRect(bx + 20, roofY - 22, bw - 40, 24);
     ctx.strokeStyle = '#f59e0b';
@@ -2371,53 +2183,22 @@ function drawBusinessPlotAndStore() {
     ctx.textAlign = 'center';
     ctx.fillText('🏪 TOKO ZAHY & AUREL ❤️', bx + bw / 2, roofY - 6);
 
-    // Interior: Shelves along north wall
-    // 1. Fruit Shelf at x: 1060, y: 260
-    const dispFruit = assetImgs['disp_fruit'];
-    if (dispFruit && dispFruit.complete && dispFruit.naturalWidth > 0) {
-      ctx.drawImage(dispFruit, 1055, 255, 42, 42);
-    } else {
-      ctx.fillStyle = '#d97706';
-      ctx.fillRect(1055, 260, 42, 34);
-      ctx.font = '14px sans-serif';
-      ctx.fillText('🍓🥕', 1076, 280);
-    }
+    // Interior: 2D Shelves & Counter
+    // 1. Fruit Shelf (tiny-farm 82 basket + shelf)
+    drawTile('tiny-farm', 82, 1060, 260, 36, 36);
+    ctx.font = '10px sans-serif';
+    ctx.fillText('🍓🥕', 1078, 270);
 
-    // 2. Bread / Bakery Shelf at x: 1205, y: 260
-    const dispBread = assetImgs['disp_bread'];
-    if (dispBread && dispBread.complete && dispBread.naturalWidth > 0) {
-      ctx.drawImage(dispBread, 1205, 255, 42, 42);
-    } else {
-      ctx.fillStyle = '#b45309';
-      ctx.fillRect(1205, 260, 42, 34);
-      ctx.font = '14px sans-serif';
-      ctx.fillText('🥖🍰', 1226, 280);
-    }
+    // 2. Bread / Bakery Shelf
+    drawTile('tiny-town', 71, 1205, 260, 36, 36);
+    ctx.font = '10px sans-serif';
+    ctx.fillText('🥖🍰', 1223, 270);
 
-    // 3. Clothing Rack at x: 1240, y: 320
-    const clothRack = assetImgs['clothing_rack'];
-    if (clothRack && clothRack.complete && clothRack.naturalWidth > 0) {
-      ctx.drawImage(clothRack, 1238, 315, 36, 42);
-    } else {
-      ctx.fillStyle = '#475569';
-      ctx.fillRect(1240, 320, 30, 35);
-      ctx.font = '12px sans-serif';
-      ctx.fillText('👗👕', 1255, 340);
-    }
+    // 3. Clothing / General Goods
+    drawTile('tiny-town', 69, 1240, 315, 32, 38);
 
-    // 4. Checkout Counter & Cash Register at x: 1125, y: 315
-    ctx.fillStyle = '#78350f';
-    ctx.fillRect(1125, 320, 65, 32);
-    ctx.fillStyle = '#9a3412';
-    ctx.fillRect(1123, 316, 69, 7); // Countertop
-
-    const cashReg = assetImgs['cash_reg'];
-    if (cashReg && cashReg.complete && cashReg.naturalWidth > 0) {
-      ctx.drawImage(cashReg, 1142, 290, 32, 32);
-    } else {
-      ctx.font = '16px sans-serif';
-      ctx.fillText('📟', 1157, 314);
-    }
+    // 4. Checkout Counter & Cash Register (tiny-city 48)
+    drawTile('tiny-city', 48, 1135, 315, 45, 36);
 
     // 5. Stocked Goods Floating Badge
     const stockCount = (store.stockedItems && store.stockedItems.length) || 0;
@@ -2429,100 +2210,39 @@ function drawBusinessPlotAndStore() {
     ctx.fillStyle = '#34d399';
     ctx.fillText(`Stok: ${stockCount} brg`, 1157, 365);
 
-    // ================= HIRED BOT EMPLOYEES =================
-    // 1. RANI THE CASHIER (Behind checkout counter at x: 1157, y: 300)
+    // ================= HIRED BOT EMPLOYEES (2D TILES) =================
+    // 1. RANI THE CASHIER (tiny-town 102)
     if (store.hiredEmployees && store.hiredEmployees.includes('rani')) {
-      const raniBob = Math.sin(Date.now() * 0.005) * 1.5;
-      ctx.save();
-      ctx.translate(1157, 300);
-
-      // Body (Green Apron)
-      ctx.fillStyle = '#10b981';
-      ctx.fillRect(-7, -4 + raniBob, 14, 14);
-
-      // Head
-      ctx.fillStyle = '#ffe0bd';
-      ctx.beginPath();
-      ctx.arc(0, -12 + raniBob, 8, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Hair (Neat Brown Bobcut)
-      ctx.fillStyle = '#451a03';
-      ctx.beginPath();
-      ctx.arc(0, -14 + raniBob, 9, Math.PI, Math.PI * 2);
-      ctx.fill();
-      ctx.fillRect(-9, -14 + raniBob, 3, 10);
-      ctx.fillRect(6, -14 + raniBob, 3, 10);
-
-      // Cheerful Eyes & Smile
-      ctx.fillStyle = '#1e293b';
-      ctx.fillRect(-3, -13 + raniBob, 2, 2.5);
-      ctx.fillRect(2, -13 + raniBob, 2, 2.5);
-
-      // Name Tag
+      const raniBob = Math.sin(Date.now() * 0.005) * 2;
+      drawTile('tiny-town', 102, 1145, 290 + raniBob, 32, 32);
       ctx.font = 'bold 9px "Segoe UI", sans-serif';
       ctx.textAlign = 'center';
       ctx.fillStyle = 'rgba(0,0,0,0.65)';
-      ctx.fillRect(-28, -32 + raniBob, 56, 13);
+      ctx.fillRect(1120, 275 + raniBob, 56, 13);
       ctx.fillStyle = '#6ee7b7';
-      ctx.fillText('Rani (Kasir) 👩‍💼', 0, -22 + raniBob);
-
-      ctx.restore();
+      ctx.fillText('Rani (Kasir) 👩‍💼', 1148, 285 + raniBob);
     }
 
-    // 2. DONI THE SHELF STOCKER (Walking between shelves at x: 1085, y: 320)
+    // 2. DONI THE SHELF STOCKER (tiny-town 96)
     if (store.hiredEmployees && store.hiredEmployees.includes('doni')) {
-      const doniBob = Math.sin(Date.now() * 0.006) * 1.8;
-      const doniWalk = Math.sin(Date.now() * 0.002) * 20; // paces near shelves
-      ctx.save();
-      ctx.translate(1085 + doniWalk, 330);
-
-      // Legs
-      ctx.fillStyle = '#1e293b';
-      ctx.fillRect(-4, 6 + doniBob, 3, 7);
-      ctx.fillRect(1, 6 - doniBob, 3, 7);
-
-      // Body (Blue Uniform)
-      ctx.fillStyle = '#2563eb';
-      ctx.fillRect(-7, -6 + doniBob, 14, 14);
-
-      // Head
-      ctx.fillStyle = '#fcd34d';
-      ctx.beginPath();
-      ctx.arc(0, -14 + doniBob, 8, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Cap
-      ctx.fillStyle = '#1d4ed8';
-      ctx.fillRect(-8, -21 + doniBob, 16, 5);
-      ctx.fillRect(-4, -24 + doniBob, 10, 4);
-
-      // Name Tag
+      const doniBob = Math.sin(Date.now() * 0.006) * 2;
+      const doniWalk = Math.sin(Date.now() * 0.002) * 20;
+      drawTile('tiny-town', 96, 1080 + doniWalk, 315 + doniBob, 32, 32, doniWalk < 0);
       ctx.font = 'bold 9px "Segoe UI", sans-serif';
       ctx.textAlign = 'center';
       ctx.fillStyle = 'rgba(0,0,0,0.65)';
-      ctx.fillRect(-34, -36 + doniBob, 68, 13);
+      ctx.fillRect(1060 + doniWalk, 300 + doniBob, 68, 13);
       ctx.fillStyle = '#93c5fd';
-      ctx.fillText('Doni (Pegawai) 🧑‍💼', 0, -26 + doniBob);
-
-      ctx.restore();
+      ctx.fillText('Doni (Pegawai) 🧑‍💼', 1094 + doniWalk, 310 + doniBob);
     }
 
-    // Animated Customer visiting Toko
-    const custBob = Math.sin(Date.now() * 0.004) * 1.5;
-    ctx.save();
-    ctx.translate(1140, 360);
-    ctx.fillStyle = '#ec4899';
-    ctx.fillRect(-6, -4 + custBob, 12, 12);
-    ctx.fillStyle = '#fed7aa';
-    ctx.beginPath();
-    ctx.arc(0, -11 + custBob, 7, 0, Math.PI * 2);
-    ctx.fill();
+    // Animated Customer visiting Toko (tiny-town 97)
+    const custBob = Math.sin(Date.now() * 0.004) * 2;
+    drawTile('tiny-town', 97, 1130, 350 + custBob, 30, 30);
     ctx.font = 'bold 8px sans-serif';
     ctx.fillStyle = '#fff';
     ctx.textAlign = 'center';
-    ctx.fillText('Pembeli 🛍️', 0, -20 + custBob);
-    ctx.restore();
+    ctx.fillText('Pembeli 🛍️', 1145, 345 + custBob);
   }
 }
 
@@ -2533,30 +2253,25 @@ function drawCityCenterAndBuildings() {
   const plazaW = 900;
   const plazaH = 620;
 
-  // Plaza Stone Pavement
-  ctx.fillStyle = '#e2e8f0';
-  ctx.fillRect(plazaX, plazaY, plazaW, plazaH);
-
-  // Decorative Paver Border
-  ctx.strokeStyle = '#cbd5e1';
-  ctx.lineWidth = 4;
-  ctx.strokeRect(plazaX + 6, plazaY + 6, plazaW - 12, plazaH - 12);
-
-  // Plaza Decorative Radial Pattern
-  ctx.strokeStyle = '#f1f5f9';
-  ctx.lineWidth = 2;
-  for (let r = 50; r < 240; r += 45) {
-    ctx.beginPath();
-    ctx.arc(1200, 1240, r, 0, Math.PI * 2);
-    ctx.stroke();
+  // Plaza Stone Pavement with 2D Paving Tiles (tiny-city 12 & 13)
+  for (let px = plazaX; px < plazaX + plazaW; px += 32) {
+    for (let py = plazaY; py < plazaY + plazaH; py += 32) {
+      const pIdx = (((px - plazaX) / 32 + (py - plazaY) / 32) % 3 === 0) ? 13 : 12;
+      drawTile('tiny-city', pIdx, px, py, 32, 32);
+    }
   }
 
-  // ================= 4 DOWNTOWN BUILDINGS ALONG NORTH =================
+  // Decorative Border
+  ctx.strokeStyle = '#94a3b8';
+  ctx.lineWidth = 4;
+  ctx.strokeRect(plazaX + 2, plazaY + 2, plazaW - 4, plazaH - 4);
+
+  // ================= 4 DOWNTOWN 2D BUILDINGS =================
   const buildings = [
-    { x: 820, y: 910, w: 130, h: 140, name: 'Balai Kota', icon: '🏛️', color: '#334155', roof: '#475569', asset: 'bldg_a' },
-    { x: 1020, y: 910, w: 130, h: 140, name: 'Toko Roti & Kue', icon: '🥖', color: '#7c2d12', roof: '#ea580c', asset: 'bldg_b' },
-    { x: 1320, y: 910, w: 130, h: 140, name: 'Butik Pasangan', icon: '👗', color: '#831843', roof: '#db2777', asset: 'bldg_c' },
-    { x: 1520, y: 910, w: 130, h: 140, name: 'Bank Desa', icon: '🏦', color: '#14532d', roof: '#16a34a', asset: 'bldg_d' }
+    { x: 820, y: 910, w: 130, h: 140, name: 'Balai Kota', icon: '🏛️', tile: 36 },
+    { x: 1020, y: 910, w: 130, h: 140, name: 'Toko Roti & Kue', icon: '🥖', tile: 38 },
+    { x: 1320, y: 910, w: 130, h: 140, name: 'Butik Pasangan', icon: '👗', tile: 40 },
+    { x: 1520, y: 910, w: 130, h: 140, name: 'Bank Desa', icon: '🏦', tile: 42 }
   ];
 
   buildings.forEach(b => {
@@ -2564,27 +2279,10 @@ function drawCityCenterAndBuildings() {
     ctx.fillStyle = 'rgba(0,0,0,0.18)';
     ctx.fillRect(b.x - 4, b.y + b.h - 6, b.w + 8, 14);
 
-    // Wall Structure
-    ctx.fillStyle = b.color;
-    ctx.fillRect(b.x, b.y + 25, b.w, b.h - 25);
-
-    // Roof
-    ctx.fillStyle = b.roof;
-    ctx.beginPath();
-    ctx.moveTo(b.x - 8, b.y + 25);
-    ctx.lineTo(b.x + b.w / 2, b.y);
-    ctx.lineTo(b.x + b.w + 8, b.y + 25);
-    ctx.fill();
-
-    // Windows (Glowing at night)
-    const isNight = sharedState.timeOfDay >= 18 || sharedState.timeOfDay < 5;
-    ctx.fillStyle = isNight ? '#fef08a' : '#bae6fd';
-    for (let wx = b.x + 16; wx < b.x + b.w - 20; wx += 32) {
-      for (let wy = b.y + 40; wy < b.y + b.h - 45; wy += 32) {
-        ctx.fillRect(wx, wy, 20, 20);
-        ctx.strokeStyle = '#334155';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(wx, wy, 20, 20);
+    // 2D Building Tiles from tiny-city
+    for (let bx = b.x; bx < b.x + b.w; bx += 40) {
+      for (let by = b.y; by < b.y + b.h; by += 40) {
+        drawTile('tiny-city', b.tile, bx, by, 40, 40);
       }
     }
 
@@ -2598,32 +2296,28 @@ function drawCityCenterAndBuildings() {
 
     // Signboard on Front
     ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
-    ctx.fillRect(b.x + 10, b.y + 28, b.w - 20, 18);
+    ctx.fillRect(b.x + 10, b.y + 12, b.w - 20, 20);
     ctx.font = 'bold 10px "Segoe UI", sans-serif';
     ctx.fillStyle = '#ffffff';
     ctx.textAlign = 'center';
-    ctx.fillText(`${b.icon} ${b.name}`, b.x + b.w / 2, b.y + 41);
+    ctx.fillText(`${b.icon} ${b.name}`, b.x + b.w / 2, b.y + 26);
   });
 
-  // ================= AIR MANCUR HARAPAN CINTA =================
+  // ================= AIR MANCUR HARAPAN CINTA (tiny-city 72) =================
   const fx = 1200;
   const fy = 1240;
 
-  // Outer stone basin
-  ctx.fillStyle = '#94a3b8';
-  ctx.beginPath();
-  ctx.arc(fx, fy, 48, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = '#cbd5e1';
-  ctx.beginPath();
-  ctx.arc(fx, fy, 44, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Crystal Pool Water
-  ctx.fillStyle = '#38bdf8';
-  ctx.beginPath();
-  ctx.arc(fx, fy, 40, 0, Math.PI * 2);
-  ctx.fill();
+  // 2D Fountain Base Tile
+  if (!drawTile('tiny-city', 72, fx - 40, fy - 40, 80, 80)) {
+    ctx.fillStyle = '#94a3b8';
+    ctx.beginPath();
+    ctx.arc(fx, fy, 44, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#38bdf8';
+    ctx.beginPath();
+    ctx.arc(fx, fy, 38, 0, Math.PI * 2);
+    ctx.fill();
+  }
 
   // Shimmering Coins in fountain
   const coinCoords = [
@@ -2636,28 +2330,13 @@ function drawCityCenterAndBuildings() {
     ctx.fill();
   });
 
-  // Animated Water Wavelets
-  ctx.strokeStyle = 'rgba(255,255,255,0.6)';
-  ctx.lineWidth = 2;
-  const rippleR = 12 + (Date.now() * 0.015) % 22;
-  ctx.beginPath();
-  ctx.arc(fx, fy, rippleR, 0, Math.PI * 2);
-  ctx.stroke();
-
-  // Central Fountain Pedestal
-  ctx.fillStyle = '#64748b';
-  ctx.beginPath();
-  ctx.arc(fx, fy, 14, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Cascading Spout & Water Spray Particles
+  // Water Spray Particles
   const spoutTime = Date.now() * 0.008;
   for (let a = 0; a < 8; a++) {
     const angle = (a / 8) * Math.PI * 2 + spoutTime;
     const dist = 18 + Math.sin(spoutTime * 2 + a) * 8;
     const px = fx + Math.cos(angle) * dist;
     const py = fy + Math.sin(angle) * dist;
-
     ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
     ctx.beginPath();
     ctx.arc(px, py, 2.5, 0, Math.PI * 2);
@@ -2667,69 +2346,43 @@ function drawCityCenterAndBuildings() {
   // Heart on Spire
   ctx.font = '16px sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText('💖', fx, fy - 6);
+  ctx.fillText('💖', fx, fy - 18);
 
   // Fountain Banner
   ctx.font = 'bold 11px "Segoe UI", sans-serif';
   ctx.fillStyle = 'rgba(0,0,0,0.7)';
-  ctx.fillRect(fx - 70, fy + 52, 140, 18);
+  ctx.fillRect(fx - 70, fy + 48, 140, 18);
   ctx.fillStyle = '#f472b6';
-  ctx.fillText('⛲ Air Mancur Harapan [E]', fx, fy + 65);
+  ctx.fillText('⛲ Air Mancur Harapan [E]', fx, fy + 61);
 
-  // Street Lamps at plaza corners
+  // 2D Street Lamps (tiny-city 84)
   const lampX = [840, 1080, 1320, 1560];
   lampX.forEach(lx => {
-    // Post
-    ctx.fillStyle = '#1e293b';
-    ctx.fillRect(lx - 2, 1140, 4, 38);
-    // Lantern head
-    ctx.fillStyle = '#fbbf24';
-    ctx.beginPath();
-    ctx.arc(lx, 1136, 6, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Warm glow if evening/night
+    drawTile('tiny-city', 84, lx - 16, 1140, 32, 40);
     if (sharedState.timeOfDay >= 17.5 || sharedState.timeOfDay < 5.5) {
       ctx.fillStyle = 'rgba(251, 191, 36, 0.22)';
       ctx.beginPath();
-      ctx.arc(lx, 1136, 38, 0, Math.PI * 2);
+      ctx.arc(lx, 1146, 38, 0, Math.PI * 2);
       ctx.fill();
     }
   });
 
-  // Couple park benches
-  ctx.fillStyle = '#854d0e';
-  ctx.fillRect(940, 1340, 45, 12);
-  ctx.fillRect(1415, 1340, 45, 12);
+  // 2D Couple Park Benches (tiny-city 85)
+  drawTile('tiny-city', 85, 940, 1335, 45, 24);
+  drawTile('tiny-city', 85, 1415, 1335, 45, 24);
 }
 
 // ================= FOREST, CAMPING & LAKE DISTRICT =================
 function drawForestAndCampingLake() {
-  // Mini Forest Creek Inlet under bridge
-  ctx.fillStyle = '#38bdf8';
-  ctx.fillRect(1710, 440, 50, 80);
-
-  // Wooden Footbridge (x: 1715, y: 460)
-  const brgImg = assetImgs['bridge'];
-  if (brgImg && brgImg.complete && brgImg.naturalWidth > 0) {
-    ctx.drawImage(brgImg, 1705, 450, 60, 55);
-  } else {
-    // Handcrafted Wood Planks
-    ctx.fillStyle = '#78350f';
-    ctx.fillRect(1705, 455, 60, 48);
-    ctx.strokeStyle = '#451a03';
-    ctx.lineWidth = 2;
-    for (let px = 1710; px <= 1760; px += 10) {
-      ctx.beginPath();
-      ctx.moveTo(px, 455);
-      ctx.lineTo(px, 503);
-      ctx.stroke();
-    }
-    // Rails
-    ctx.fillStyle = '#9a3412';
-    ctx.fillRect(1705, 452, 60, 4);
-    ctx.fillRect(1705, 501, 60, 4);
+  // Mini Forest Creek Inlet (tiny-town 109)
+  for (let cy = 440; cy < 520; cy += 32) {
+    drawTile('tiny-town', 109, 1715, cy, 32, 32);
+    drawTile('tiny-town', 109, 1740, cy, 32, 32);
   }
+
+  // Wooden Footbridge (tiny-town 78, 79, 80)
+  drawTile('tiny-town', 78, 1705, 455, 32, 36);
+  drawTile('tiny-town', 79, 1735, 455, 32, 36);
 
   // ================= GRAND ROMANTIC LAKE =================
   const lakeX = 2000;
@@ -2737,7 +2390,7 @@ function drawForestAndCampingLake() {
   const lakeRx = 180;
   const lakeRy = 110;
 
-  // Deep Water
+  // Water background
   const waterGrad = ctx.createRadialGradient(lakeX, lakeY, 30, lakeX, lakeY, lakeRx);
   waterGrad.addColorStop(0, '#1d4ed8');
   waterGrad.addColorStop(1, '#2563eb');
@@ -2751,6 +2404,10 @@ function drawForestAndCampingLake() {
   ctx.lineWidth = 4;
   ctx.stroke();
 
+  // Water ripples from tiny-town 109
+  drawTile('tiny-town', 109, lakeX - 40, lakeY - 30, 32, 32);
+  drawTile('tiny-town', 109, lakeX + 30, lakeY + 20, 32, 32);
+
   // Swimming Fish Shadows
   const fishTime = Date.now() * 0.001;
   for (let f = 0; f < 3; f++) {
@@ -2762,16 +2419,9 @@ function drawForestAndCampingLake() {
     ctx.fill();
   }
 
-  // Wooden Fishing Pier at Lake (x: 1820..1910, y: 465..505)
-  ctx.fillStyle = '#854d0e';
-  ctx.fillRect(1820, 465, 90, 40);
-  ctx.strokeStyle = '#58310c';
-  ctx.lineWidth = 2;
-  for (let px = 1830; px <= 1905; px += 12) {
-    ctx.beginPath();
-    ctx.moveTo(px, 465);
-    ctx.lineTo(px, 505);
-    ctx.stroke();
+  // Wooden Fishing Pier at Lake (tiny-town 78, 79, 80)
+  for (let px = 1820; px < 1910; px += 30) {
+    drawTile('tiny-town', 78, px, 465, 30, 40);
   }
   ctx.font = '16px sans-serif';
   ctx.fillText('🎣', 1885, 492);
@@ -2784,73 +2434,35 @@ function drawForestAndCampingLake() {
   const campX = 2140;
   const campY = 280;
 
-  // Couple Camping Tent
-  ctx.fillStyle = '#ea580c';
-  ctx.beginPath();
-  ctx.moveTo(campX - 35, campY + 20);
-  ctx.lineTo(campX, campY - 30);
-  ctx.lineTo(campX + 35, campY + 20);
-  ctx.fill();
-  // Tent door
-  ctx.fillStyle = '#431407';
-  ctx.beginPath();
-  ctx.moveTo(campX - 14, campY + 20);
-  ctx.lineTo(campX, campY - 14);
-  ctx.lineTo(campX + 14, campY + 20);
-  ctx.fill();
-  ctx.font = '12px sans-serif';
-  ctx.fillText('⛺', campX, campY);
+  // 2D Camping Tent (tiny-farm 116)
+  if (!drawTile('tiny-farm', 116, campX - 25, campY - 25, 50, 50)) {
+    ctx.font = '28px sans-serif';
+    ctx.fillText('⛺', campX, campY);
+  }
 
-  // Campfire (x: 2075, y: 300)
+  // Campfire (tiny-farm 117)
   const fireX = 2075;
   const fireY = 300;
-
-  // Fire ring stones
-  ctx.fillStyle = '#64748b';
-  for (let a = 0; a < 8; a++) {
-    const sa = (a / 8) * Math.PI * 2;
+  if (!drawTile('tiny-farm', 117, fireX - 20, fireY - 20, 40, 40)) {
+    ctx.fillStyle = '#ef4444';
     ctx.beginPath();
-    ctx.arc(fireX + Math.cos(sa) * 12, fireY + Math.sin(sa) * 8, 3.5, 0, Math.PI * 2);
+    ctx.arc(fireX, fireY, 8, 0, Math.PI * 2);
     ctx.fill();
   }
 
-  // Fire logs
-  ctx.fillStyle = '#78350f';
-  ctx.fillRect(fireX - 10, fireY - 3, 20, 6);
-  ctx.fillRect(fireX - 3, fireY - 10, 6, 20);
-
-  // Dancing Flames
+  // Dancing Flames & floating embers
   const flameFlicker = Math.sin(Date.now() * 0.02) * 3;
-  ctx.fillStyle = '#ef4444';
-  ctx.beginPath();
-  ctx.arc(fireX, fireY - 6 + flameFlicker, 7, 0, Math.PI * 2);
-  ctx.fill();
   ctx.fillStyle = '#f59e0b';
   ctx.beginPath();
-  ctx.arc(fireX, fireY - 8 + flameFlicker, 4.5, 0, Math.PI * 2);
+  ctx.arc(fireX, fireY - 10 + flameFlicker, 5, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = '#fef08a';
-  ctx.beginPath();
-  ctx.arc(fireX, fireY - 9 + flameFlicker, 2.5, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Floating spark embers
   const sparkY = (Date.now() * 0.05) % 25;
   ctx.fillStyle = '#fbbf24';
   ctx.beginPath();
-  ctx.arc(fireX + Math.sin(sparkY) * 6, fireY - 10 - sparkY, 1.5, 0, Math.PI * 2);
+  ctx.arc(fireX + Math.sin(sparkY) * 6, fireY - 12 - sparkY, 1.5, 0, Math.PI * 2);
   ctx.fill();
 
-  // Tree Stumps / Log seats around fire
-  ctx.fillStyle = '#854d0e';
-  ctx.beginPath();
-  ctx.ellipse(fireX - 22, fireY, 8, 6, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.ellipse(fireX + 22, fireY, 8, 6, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Dense Pine Trees scattered
+  // Dense 2D Trees scattered (tiny-town 48 & tiny-farm 48)
   const pineTrees = [
     { x: 1800, y: 220 }, { x: 1880, y: 160 }, { x: 1960, y: 230 },
     { x: 2230, y: 180 }, { x: 2310, y: 260 }, { x: 2280, y: 440 },
@@ -2858,20 +2470,7 @@ function drawForestAndCampingLake() {
     { x: 1840, y: 720 }, { x: 2260, y: 740 }
   ];
   pineTrees.forEach(pt => {
-    // Pine trunk
-    ctx.fillStyle = '#58310c';
-    ctx.fillRect(pt.x - 5, pt.y, 10, 24);
-    // Pine foliage layers (Triangle tiers)
-    ctx.fillStyle = '#14532d';
-    for (let layer = 0; layer < 3; layer++) {
-      const ly = pt.y - layer * 14;
-      const lw = 28 - layer * 6;
-      ctx.beginPath();
-      ctx.moveTo(pt.x - lw, ly + 8);
-      ctx.lineTo(pt.x, ly - 14);
-      ctx.lineTo(pt.x + lw, ly + 8);
-      ctx.fill();
-    }
+    drawTile('tiny-town', 48, pt.x - 20, pt.y - 36, 40, 48);
   });
 }
 
