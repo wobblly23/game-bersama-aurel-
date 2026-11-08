@@ -348,6 +348,39 @@ document.getElementById('btn-hold-hands').addEventListener('click', () => {
   socket.emit('couple_action', { actionType: 'hold_hands' });
 });
 
+// Polaroid Snapshot Feature
+document.getElementById('btn-photo').addEventListener('click', () => {
+  window.soundManager.playLove();
+  addFloatingText(canvas.width / 2, canvas.height / 2 - 40, '📸 Cekrek! Mengabadikan momen manis... ❤️', '#ff477e');
+
+  setTimeout(() => {
+    // Create polaroid frame
+    const pCanvas = document.createElement('canvas');
+    pCanvas.width = canvas.width + 40;
+    pCanvas.height = canvas.height + 90;
+    const pCtx = pCanvas.getContext('2d');
+
+    // Polaroid white frame with subtle gradient & shadow
+    pCtx.fillStyle = '#ffffff';
+    pCtx.fillRect(0, 0, pCanvas.width, pCanvas.height);
+
+    // Inner photo
+    pCtx.drawImage(canvas, 20, 20);
+
+    // Polaroid caption text
+    pCtx.font = 'bold 22px "Segoe UI", sans-serif';
+    pCtx.fillStyle = '#ff477e';
+    pCtx.textAlign = 'center';
+    pCtx.fillText(`🌸 Zahy & Aurel di Desa Cinta • Hari ke-${sharedState.dayCount} ❤️`, pCanvas.width / 2, pCanvas.height - 35);
+
+    // Trigger download
+    const link = document.createElement('a');
+    link.download = `Kenangan-Zahy-Aurel-Hari-${sharedState.dayCount}.png`;
+    link.href = pCanvas.toDataURL('image/png');
+    link.click();
+  }, 300);
+});
+
 // Modal Toggles
 document.getElementById('btn-open-fridge').addEventListener('click', () => openModal('modal-fridge'));
 document.getElementById('btn-open-notes').addEventListener('click', () => openModal('modal-notes'));
