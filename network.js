@@ -187,10 +187,38 @@ class HybridNetwork {
     });
   }
 
+  saveWorld() {
+    if (!this.localState) return;
+    try {
+      const dataToSave = {
+        sharedState: this.localState.sharedState,
+        farmingPlots: this.localState.farmingPlots,
+        chatMessages: this.localState.chatMessages ? this.localState.chatMessages.slice(-30) : [],
+        timestamp: Date.now()
+      };
+      localStorage.setItem('desa_cinta_save_' + this.roomCode, JSON.stringify(dataToSave));
+      window.showSaveIndicator?.();
+    } catch (e) {
+      console.warn('Gagal menyimpan ke localStorage:', e);
+    }
+  }
+
+  loadWorld() {
+    try {
+      const savedStr = localStorage.getItem('desa_cinta_save_' + this.roomCode);
+      if (savedStr) {
+        return JSON.parse(savedStr);
+      }
+    } catch (e) {
+      console.warn('Gagal membaca save data:', e);
+    }
+    return null;
+  }
+
   // ================= HOST LOGIC =================
   setupHostState() {
-    // Generate farm plots
-    const farmingPlots = [];
+    // Generate default farm plots
+    let farmingPlots = [];
     const startX = 360;
     const startY = 560;
     let id = 1;
@@ -206,6 +234,34 @@ class HybridNetwork {
           maxGrowth: 100
         });
       }
+    }
+
+    let defaultSharedState = {
+      coins: 100,
+      lovePoints: 10,
+      fridge: [
+        { id: 'water', name: 'Air Segar', count: 4, icon: '💧' },
+        { id: 'bread', name: 'Roti Hangat', count: 2, icon: '🍞' },
+        { id: 'seed_strawberry', name: 'Bibit Stroberi', count: 4, icon: '🍓' },
+        { id: 'seed_carrot', name: 'Bibit Wortel', count: 4, icon: '🥕' }
+      ],
+      loveNotes: [
+        { from: 'Cinta Kita', text: 'Selamat datang di rumah impian kita! Mari saling menjaga dan merawat tempat ini bersama ❤️', time: 'Hari ini' }
+      ],
+      cafeStand: { stockedItems: [], totalSold: 0 },
+      timeOfDay: 7.0,
+      dayCount: 1
+    };
+
+    let chatMessages = [];
+
+    // Check if previous save exists in localStorage!
+    const saved = this.loadWorld();
+    if (saved) {
+      console.log('🌸 Memuat data tersimpan dari permainan sebelumnya! ❤️');
+      if (saved.sharedState) defaultSharedState = saved.sharedState;
+      if (saved.farmingPlots && saved.farmingPlots.length > 0) farmingPlots = saved.farmingPlots;
+      if (saved.chatMessages) chatMessages = saved.chatMessages;
     }
 
     this.localState = {
@@ -226,24 +282,9 @@ class HybridNetwork {
           emote: null
         }
       },
-      sharedState: {
-        coins: 100,
-        lovePoints: 10,
-        fridge: [
-          { id: 'water', name: 'Air Segar', count: 4, icon: '💧' },
-          { id: 'bread', name: 'Roti Hangat', count: 2, icon: '🍞' },
-          { id: 'seed_strawberry', name: 'Bibit Stroberi', count: 4, icon: '🍓' },
-          { id: 'seed_carrot', name: 'Bibit Wortel', count: 4, icon: '🥕' }
-        ],
-        loveNotes: [
-          { from: 'Cinta Kita', text: 'Selamat datang di rumah impian kita! Mari saling menjaga dan merawat tempat ini bersama ❤️', time: 'Hari ini' }
-        ],
-        cafeStand: { stockedItems: [], totalSold: 0 },
-        timeOfDay: 7.0,
-        dayCount: 1
-      },
+      sharedState: defaultSharedState,
       farmingPlots,
-      chatMessages: []
+      chatMessages
     };
 
     // Emit init state to local player
@@ -291,6 +332,11 @@ class HybridNetwork {
         };
         this.trigger('cafe_sale', saleData);
         if (this.conn) this.conn.send({ type: 'cafe_sale', data: saleData });
+      }
+
+      // Periodically save world (every 10s)
+      if (Math.floor(state.timeOfDay * 10) % 5 === 0) {
+        this.saveWorld();
       }
 
       const tickData = {
@@ -377,6 +423,34 @@ class HybridNetwork {
   handleClientIncoming(msg) {
     const { type, data } = msg;
     this.trigger(type, data);
+
+    // Save backup to Client local storage
+    try {
+      if (type === 'init_room_state') {
+        const clientSave = {
+          sharedState: data.sharedState,
+          farmingPlots: data.farmingPlots,
+          chatMessages: data.chatMessages || [],
+          timestamp: Date.now()
+        };
+        localStorage.setItem('desa_cinta_save_' + this.roomCode, JSON.stringify(clientSave));
+      } else if (type === 'farming_updated' || type === 'trade_completed' || type === 'morning_arrived' || type === 'love_notes_updated') {
+        const existing = localStorage.getItem('desa_cinta_save_' + this.roomCode);
+        if (existing) {
+          const s = JSON.parse(existing);
+          if (data.fridge) s.sharedState.fridge = data.fridge;
+          if (data.coins !== undefined) s.sharedState.coins = data.coins;
+          if (data.lovePoints !== undefined) s.sharedState.lovePoints = data.lovePoints;
+          if (data.plot) {
+            const idx = s.farmingPlots.findIndex(p => p.id === data.plot.id);
+            if (idx !== -1) s.farmingPlots[idx] = data.plot;
+          }
+          if (data.notes) s.sharedState.loveNotes = data.notes;
+          if (data.dayCount) s.sharedState.dayCount = data.dayCount;
+          localStorage.setItem('desa_cinta_save_' + this.roomCode, JSON.stringify(s));
+        }
+      }
+    } catch (e) {}
   }
 
   handlePeerEmit(event, data) {
@@ -456,6 +530,7 @@ class HybridNetwork {
         if (this.conn) this.conn.send({ type: 'hands_held', data: res });
       }
     }
+    this.saveWorld();
   }
 
   performFarmingAction(fromId, { plotId, action, cropType }) {
@@ -501,6 +576,7 @@ class HybridNetwork {
     };
     this.trigger('farming_updated', res);
     if (this.conn) this.conn.send({ type: 'farming_updated', data: res });
+    this.saveWorld();
   }
 
   performFishCaught(fromId, { fishType }) {
@@ -521,6 +597,7 @@ class HybridNetwork {
     };
     this.trigger('fish_result', res);
     if (this.conn) this.conn.send({ type: 'fish_result', data: res });
+    this.saveWorld();
   }
 
   performCookRecipe(fromId, { recipeId }) {
@@ -556,6 +633,7 @@ class HybridNetwork {
       };
       this.trigger('cooking_success', res);
       if (this.conn) this.conn.send({ type: 'cooking_success', data: res });
+      this.saveWorld();
     }
   }
 
@@ -579,6 +657,7 @@ class HybridNetwork {
     };
     this.trigger('player_ate', res);
     if (this.conn) this.conn.send({ type: 'player_ate', data: res });
+    this.saveWorld();
   }
 
   performSleep(fromId, { isSleeping }) {
@@ -611,6 +690,7 @@ class HybridNetwork {
       this.trigger('player_sleep_state', res);
       if (this.conn) this.conn.send({ type: 'player_sleep_state', data: res });
     }
+    this.saveWorld();
   }
 
   performAddNote(fromId, { text }) {
@@ -628,6 +708,7 @@ class HybridNetwork {
     const res = { notes: this.localState.sharedState.loveNotes, lovePoints: this.localState.sharedState.lovePoints };
     this.trigger('love_notes_updated', res);
     if (this.conn) this.conn.send({ type: 'love_notes_updated', data: res });
+    this.saveWorld();
   }
 
   performShopTransaction(fromId, { action, itemType, cost, price }) {
@@ -642,6 +723,7 @@ class HybridNetwork {
         const res = { coins: state.coins, fridge: state.fridge, message: `Membeli 1x ${itemType.name}!` };
         this.trigger('trade_completed', res);
         if (this.conn) this.conn.send({ type: 'trade_completed', data: res });
+        this.saveWorld();
       }
     } else if (action === 'sell') {
       const item = state.fridge.find(i => i.id === itemType.id && i.count > 0);
@@ -653,6 +735,7 @@ class HybridNetwork {
         const res = { coins: state.coins, fridge: state.fridge, message: `Menjual 1x ${itemType.name} (+🪙${price})!` };
         this.trigger('trade_completed', res);
         if (this.conn) this.conn.send({ type: 'trade_completed', data: res });
+        this.saveWorld();
       }
     }
   }
@@ -668,7 +751,9 @@ class HybridNetwork {
     const res = { cafeStand: this.localState.sharedState.cafeStand, fridge: this.localState.sharedState.fridge };
     this.trigger('cafe_updated', res);
     if (this.conn) this.conn.send({ type: 'cafe_updated', data: res });
+    this.saveWorld();
   }
 }
 
 window.socket = new HybridNetwork();
+

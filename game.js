@@ -66,6 +66,40 @@ for (let i = 0; i < 30; i++) {
 }
 
 // ================= LOBBY & SETUP =================
+// Restore previous player name, room, and avatar
+const savedName = localStorage.getItem('desa_cinta_my_name');
+if (savedName) {
+  myPlayerName = savedName;
+  document.getElementById('input-player-name').value = savedName;
+}
+
+const savedRoom = localStorage.getItem('desa_cinta_room_code');
+if (savedRoom) {
+  roomCode = savedRoom;
+  document.getElementById('input-room-code').value = savedRoom;
+}
+
+const savedGender = localStorage.getItem('desa_cinta_my_gender');
+if (savedGender) {
+  myGender = savedGender;
+  document.querySelectorAll('.avatar-option').forEach(o => {
+    if (o.dataset.gender === savedGender) {
+      document.querySelectorAll('.avatar-option').forEach(el => el.classList.remove('active'));
+      o.classList.add('active');
+      myColor = o.dataset.color;
+    }
+  });
+}
+
+// Auto-save notification in HUD
+window.showSaveIndicator = function() {
+  const pill = document.getElementById('save-indicator');
+  if (pill) {
+    pill.style.opacity = '1';
+    setTimeout(() => { pill.style.opacity = '0'; }, 1500);
+  }
+};
+
 // Check room code in URL query (?room=XXX)
 const urlParams = new URLSearchParams(window.location.search);
 if (urlParams.get('room')) {
@@ -87,6 +121,11 @@ document.getElementById('btn-join-game').addEventListener('click', () => {
   const roomInput = document.getElementById('input-room-code').value.trim();
   if (nameInput) myPlayerName = nameInput;
   if (roomInput) roomCode = roomInput.toUpperCase();
+
+  // Save profile to localStorage
+  localStorage.setItem('desa_cinta_my_name', myPlayerName);
+  localStorage.setItem('desa_cinta_room_code', roomCode);
+  localStorage.setItem('desa_cinta_my_gender', myGender);
 
   // Hide lobby
   document.getElementById('lobby-screen').style.display = 'none';
