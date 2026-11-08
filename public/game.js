@@ -1141,11 +1141,6 @@ function checkProximity(p) {
     promptEl.style.display = 'none';
   }
 }
-    promptEl.style.display = 'block';
-  } else {
-    promptEl.style.display = 'none';
-  }
-}
 
 // ================= CANVAS DRAWING =================
 function render() {

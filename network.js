@@ -80,26 +80,37 @@ class HybridNetwork {
     this.mode = 'peer';
     console.log('🌸 Memulai mode Netlify / P2P WebRTC PeerJS...');
 
+    // Immediately initialize local host state so player enters the game instantly!
+    this.isHost = true;
+    this.myId = 'host';
+    this.setupHostState();
+
+    if (typeof Peer === 'undefined') {
+      console.warn('PeerJS library belum siap, menjalankan mode lokal...');
+      return;
+    }
+
     const hostPeerId = `desa-cinta-${this.roomCode}-h`;
     const clientPeerId = `desa-cinta-${this.roomCode}-c`;
 
     // First, attempt to become the HOST
-    this.peer = new Peer(hostPeerId, {
-      debug: 1,
-      config: {
-        iceServers: [
-          { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:stun1.l.google.com:19302' }
-        ]
-      }
-    });
+    try {
+      this.peer = new Peer(hostPeerId, {
+        debug: 1,
+        config: {
+          iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' }
+          ]
+        }
+      });
+    } catch (e) {
+      console.warn('Gagal membuat Peer:', e);
+      return;
+    }
 
     this.peer.on('open', (id) => {
-      // Successfully registered as Host!
-      this.isHost = true;
-      this.myId = 'host';
       console.log('Menjadi Host Kamar:', id);
-      this.setupHostState();
 
       // Listen for incoming connection from Player 2 (Client)
       this.peer.on('connection', (conn) => {
