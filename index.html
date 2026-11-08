@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Desa Cinta Berdua 🌸 - Mabar Co-op Life & Survival</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="network.js"></script>
+</head>
+<body>
+  <div id="game-container">
+    <canvas id="gameCanvas" width="960" height="720"></canvas>
+
+    <!-- ================= LOBBY SCREEN ================= -->
+    <div id="lobby-screen">
+      <div class="lobby-card">
+        <h1 class="lobby-title">🏡 Desa Cinta Berdua 🌸</h1>
+        <p class="lobby-subtitle">Game web santai untuk mabar berpasangan, bertani, memancing, dan membangun bisnis bersama ❤️</p>
+
+        <div class="form-group">
+          <label>Nama Kamu:</label>
+          <input type="text" id="input-player-name" class="form-input" placeholder="Misal: Zahy / Aurel" value="Zahy" maxlength="15">
+        </div>
+
+        <div class="form-group">
+          <label>Pilih Karakter:</label>
+          <div class="avatar-selector">
+            <div class="avatar-option active" data-gender="boy" data-color="#4A90E2">
+              <span>👦</span>
+              <div>Cowok</div>
+            </div>
+            <div class="avatar-option" data-gender="girl" data-color="#FF6584">
+              <span>👧</span>
+              <div>Cewek</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Kode Kamar (Room Code):</label>
+          <input type="text" id="input-room-code" class="form-input" placeholder="KODE-KITA" value="AUREL-KITA" maxlength="16">
+          <small style="color:#a0aec0; font-size:11px;">Kalian berdua cukup masukkan kode kamar yang sama untuk langsung ketemu!</small>
+        </div>
+
+        <button id="btn-join-game" class="btn-start">Masuk ke Dunia Kita 🚀</button>
+      </div>
+    </div>
+
+    <!-- ================= HUD OVERLAY ================= -->
+    <div id="hud-overlay">
+      <!-- Top Header -->
+      <div class="hud-top">
+        <div class="hud-stats-group">
+          <div class="hud-pill" id="pill-room" title="Klik untuk salin link mabar">
+            <span>🔑 Kamar: <strong id="hud-room-code">AUREL-KITA</strong></span>
+            <span style="font-size: 11px; color:#ff477e; cursor:pointer;" id="btn-copy-link">📋 Salin Link</span>
+          </div>
+          <div class="hud-pill">
+            <span>🪙 <strong id="hud-coins">100</strong></span>
+            <span style="margin-left:8px;">❤️ <strong id="hud-love">10</strong></span>
+          </div>
+        </div>
+
+        <div class="hud-pill">
+          <span id="hud-time-icon">☀️</span>
+          <span id="hud-clock">07:00</span>
+          <span style="color:#718096; font-size:11px;">(Hari ke-<span id="hud-day">1</span>)</span>
+          <span id="btn-music" style="cursor:pointer; margin-left:8px;" title="Musik Santai">🎵</span>
+          <span id="btn-fullscreen" style="cursor:pointer; margin-left:8px;" title="Layar Penuh">⛶</span>
+        </div>
+      </div>
+
+      <!-- Player Survival Status (Energy & Hunger) -->
+      <div class="player-status-card">
+        <div style="font-weight:bold; font-size:13px; color:#2d3748; margin-bottom:4px;" id="hud-player-name">Zahy</div>
+        <div class="status-bar-container">
+          <div class="status-label"><span>⚡ Energi</span> <span id="label-energy">100%</span></div>
+          <div class="status-bar-bg"><div class="status-bar-fill fill-energy" id="bar-energy" style="width: 100%;"></div></div>
+          
+          <div class="status-label"><span>🍗 Kenyang</span> <span id="label-hunger">100%</span></div>
+          <div class="status-bar-bg"><div class="status-bar-fill fill-hunger" id="bar-hunger" style="width: 100%;"></div></div>
+        </div>
+      </div>
+
+      <!-- Action Prompt (e.g. Tekan [E] atau tap untuk berinteraksi) -->
+      <div id="interaction-prompt">Tekan [E] atau Sentuh untuk Interaksi</div>
+
+      <!-- Couple Action Buttons (Bottom Right) -->
+      <div class="couple-actions">
+        <div class="action-row">
+          <button class="hud-btn btn-love" id="btn-hug" title="Peluk Pacar">🤗 Peluk</button>
+          <button class="hud-btn btn-love" id="btn-kiss" title="Cium Pacar">😘 Kiss</button>
+          <button class="hud-btn" id="btn-hold-hands" title="Gandengan Tangan">🤝 Gandeng</button>
+        </div>
+        <div class="action-row">
+          <button class="hud-btn" id="btn-photo" title="Ambil Foto Polaroid Berdua">📸 Foto</button>
+          <button class="hud-btn" id="btn-open-fridge">🎒 Kulkas & Tas</button>
+          <button class="hud-btn" id="btn-open-notes">💌 Surat Cinta</button>
+          <button class="hud-btn" id="btn-open-chat">💬 Chat</button>
+        </div>
+      </div>
+
+      <!-- Chat Box Floating -->
+      <div id="chat-box">
+        <div style="padding:6px 12px; background:#fff0f3; font-size:12px; font-weight:bold; color:#ff477e; display:flex; justify-content:space-between;">
+          <span>Obrolan Berdua ❤️</span>
+          <span id="btn-close-chat" style="cursor:pointer;">✕</span>
+        </div>
+        <div id="chat-messages"></div>
+        <div id="chat-input-bar">
+          <input type="text" id="chat-input" placeholder="Ketik pesan manis..." maxlength="120">
+          <button id="chat-send-btn">Kirim</button>
+        </div>
+      </div>
+
+      <!-- Virtual D-Pad for Mobile -->
+      <div id="mobile-controls">
+        <div class="dpad-btn dpad-up" id="dpad-up">▲</div>
+        <div class="dpad-btn dpad-left" id="dpad-left">◀</div>
+        <div class="dpad-btn dpad-right" id="dpad-right">▶</div>
+        <div class="dpad-btn dpad-down" id="dpad-down">▼</div>
+      </div>
+    </div>
+
+    <!-- ================= MODAL: KULKAS & TAS ================= -->
+    <div class="modal-overlay" id="modal-fridge">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>🎒 Kulkas & Tas Bersama</h3>
+          <button class="btn-close" onclick="closeAllModals()">✕</button>
+        </div>
+        <p style="font-size:12px; color:#718096; margin-bottom:12px;">Semua bahan makanan, bibit, dan hasil panen tersimpan di sini dan bisa dipakai berdua.</p>
+        <div class="item-grid" id="fridge-items-list"></div>
+      </div>
+    </div>
+
+    <!-- ================= MODAL: DAPUR MEMASAK ================= -->
+    <div class="modal-overlay" id="modal-kitchen">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>🍳 Dapur Masak Bersama</h3>
+          <button class="btn-close" onclick="closeAllModals()">✕</button>
+        </div>
+        <p style="font-size:12px; color:#718096; margin-bottom:14px;">Masak hidangan bergizi untuk memulihkan rasa lapar dan energi pacarmu!</p>
+        <div class="item-grid">
+          <div class="item-card">
+            <span class="item-icon">🥗</span>
+            <div class="item-name">Salad Segar</div>
+            <div class="item-count">Butuh: 1x Wortel, 1x Stroberi</div>
+            <button class="btn-item-action" onclick="cookRecipe('salad')">Masak (+40 Kenyang)</button>
+          </div>
+          <div class="item-card">
+            <span class="item-icon">🍱</span>
+            <div class="item-name">Ikan Bakar Spesial</div>
+            <div class="item-count">Butuh: 1x Ikan Danau</div>
+            <button class="btn-item-action" onclick="cookRecipe('grilled_fish')">Masak (+60 Kenyang)</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= MODAL: TOKO & PASAR DESA ================= -->
+    <div class="modal-overlay" id="modal-shop">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>🏪 Pasar & Toko Pak Joko</h3>
+          <button class="btn-close" onclick="closeAllModals()">✕</button>
+        </div>
+        <p style="font-size:12px; color:#718096; margin-bottom:12px;">Beli bibit untuk berkebun, atau jual hasil panen dan ikan untuk menambah tabungan koin bersama!</p>
+        
+        <h4 style="font-size:14px; margin-bottom:8px; color:#4a5568;">Beli Bibit Tanaman:</h4>
+        <div class="item-grid">
+          <div class="item-card">
+            <span class="item-icon">🍓</span>
+            <div class="item-name">Bibit Stroberi</div>
+            <div class="item-count">Harga: 🪙 15</div>
+            <button class="btn-item-action" onclick="buyItem({ id: 'seed_strawberry', name: 'Bibit Stroberi', icon: '🍓' }, 15)">Beli</button>
+          </div>
+          <div class="item-card">
+            <span class="item-icon">🥕</span>
+            <div class="item-name">Bibit Wortel</div>
+            <div class="item-count">Harga: 🪙 10</div>
+            <button class="btn-item-action" onclick="buyItem({ id: 'seed_carrot', name: 'Bibit Wortel', icon: '🥕' }, 10)">Beli</button>
+          </div>
+        </div>
+
+        <h4 style="font-size:14px; margin-top:14px; margin-bottom:8px; color:#4a5568;">Jual Hasil Panen & Tangkapan:</h4>
+        <div class="item-grid" id="shop-sell-grid"></div>
+      </div>
+    </div>
+
+    <!-- ================= MODAL: STAN KAFE / BISNIS BERDUA ================= -->
+    <div class="modal-overlay" id="modal-cafe">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>☕ Stan Bisnis Kedai Berdua</h3>
+          <button class="btn-close" onclick="closeAllModals()">✕</button>
+        </div>
+        <p style="font-size:12px; color:#718096; margin-bottom:12px;">Pajang makanan & hasil kebun di stan depan rumah. Warga desa yang lewat akan mampir membeli secara otomatis!</p>
+        
+        <div style="background:#fffaf0; border:1px solid #feebc8; padding:10px 14px; border-radius:12px; margin-bottom:14px;">
+          <div style="font-size:13px; font-weight:bold; color:#c05621;">Status Kedai: <span id="cafe-status-text">Aktif</span></div>
+          <div style="font-size:12px; color:#7b341e;">Total Makanan Terjual: <strong id="cafe-sold-count">0</strong> porsi</div>
+        </div>
+
+        <h4 style="font-size:14px; margin-bottom:8px;">Pilih Makanan dari Kulkas untuk Dijual:</h4>
+        <div class="item-grid" id="cafe-stock-grid"></div>
+      </div>
+    </div>
+
+    <!-- ================= MODAL: PAPAN SURAT CINTA ================= -->
+    <div class="modal-overlay" id="modal-notes">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>💌 Papan Surat Cinta</h3>
+          <button class="btn-close" onclick="closeAllModals()">✕</button>
+        </div>
+        <p style="font-size:12px; color:#718096; margin-bottom:10px;">Tinggalkan pesan manis untuk pasanganmu yang akan terpajang di dinding rumah ❤️</p>
+        
+        <div style="display:flex; gap:8px; margin-bottom:16px;">
+          <input type="text" id="input-love-note" class="form-input" placeholder="Tulis sesuatu yang manis..." maxlength="100">
+          <button class="hud-btn btn-love" id="btn-submit-note" style="white-space:nowrap;">Tempel 📌</button>
+        </div>
+
+        <div id="love-notes-list" style="display:flex; flex-direction:column; gap:10px; max-height:260px; overflow-y:auto;"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="audio.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
+

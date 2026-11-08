@@ -2,8 +2,8 @@
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
-// Socket setup
-const socket = io();
+// Socket & PeerJS Network Setup
+const socket = window.socket;
 
 // Game State
 let myId = null;
@@ -96,8 +96,8 @@ document.getElementById('btn-join-game').addEventListener('click', () => {
   // Initialize Audio
   window.soundManager.startBGM();
 
-  // Join Room
-  socket.emit('join_room', {
+  // Join Room (Works on local Socket.io OR Netlify/GitHub Pages P2P)
+  socket.init({
     roomCode,
     playerName: myPlayerName,
     avatarGender: myGender,
