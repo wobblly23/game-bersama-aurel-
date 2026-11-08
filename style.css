@@ -264,6 +264,145 @@ canvas#gameCanvas {
   background: linear-gradient(90deg, #fc8181, #f56565);
 }
 
+/* ================= TOOL HOTBAR ================= */
+#tool-hotbar {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(8px);
+  padding: 6px 10px;
+  border-radius: 20px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+  pointer-events: auto;
+  z-index: 15;
+}
+
+.tool-slot {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  border: 2px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background: #f7fafc;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.tool-slot:hover {
+  transform: translateY(-2px);
+  border-color: #ff6584;
+}
+
+.tool-slot.active {
+  border-color: #ff477e;
+  background: #fff0f3;
+  box-shadow: 0 4px 12px rgba(255, 71, 126, 0.35);
+  transform: translateY(-4px);
+}
+
+.tool-icon {
+  font-size: 22px;
+}
+
+.tool-num {
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  font-size: 9px;
+  font-weight: bold;
+  color: #a0aec0;
+}
+
+/* ================= NPC DIALOGUE BOX ================= */
+#npc-dialogue-box {
+  position: absolute;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90%;
+  max-width: 580px;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(10px);
+  border-radius: 20px;
+  padding: 16px 20px;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.25);
+  display: none;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: auto;
+  z-index: 40;
+  border: 2px solid #ffccd5;
+  animation: popIn 0.3s ease-out;
+}
+
+.dialogue-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dialogue-avatar {
+  font-size: 32px;
+  background: #fff0f3;
+  width: 46px;
+  height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+}
+
+.dialogue-name {
+  font-size: 15px;
+  font-weight: bold;
+  color: #2d3748;
+}
+
+.dialogue-role {
+  font-size: 11px;
+  color: #718096;
+}
+
+.dialogue-text {
+  font-size: 14px;
+  line-height: 1.5;
+  color: #2d3748;
+  margin: 6px 0;
+}
+
+.dialogue-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.btn-dialogue {
+  padding: 8px 14px;
+  border: none;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-dialogue-primary {
+  background: #ff477e;
+  color: white;
+}
+.btn-dialogue-secondary {
+  background: #edf2f7;
+  color: #4a5568;
+}
+
 /* Couple action buttons (Bottom right & center) */
 .couple-actions {
   position: absolute;

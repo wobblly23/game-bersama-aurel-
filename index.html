@@ -85,6 +85,46 @@
         </div>
       </div>
 
+      <!-- Tool Hotbar (Aktif di Tangan) -->
+      <div id="tool-hotbar">
+        <div class="tool-slot active" data-tool="hoe" title="1. Cangkul Tanah">
+          <span class="tool-num">1</span>
+          <span class="tool-icon">🪓</span>
+        </div>
+        <div class="tool-slot" data-tool="watering_can" title="2. Penyiram Air">
+          <span class="tool-num">2</span>
+          <span class="tool-icon">💧</span>
+        </div>
+        <div class="tool-slot" data-tool="fishing_rod" title="3. Pancingan">
+          <span class="tool-num">3</span>
+          <span class="tool-icon">🎣</span>
+        </div>
+        <div class="tool-slot" data-tool="basket" title="4. Keranjang Panen">
+          <span class="tool-num">4</span>
+          <span class="tool-icon">🧺</span>
+        </div>
+        <div class="tool-slot" data-tool="rose" title="5. Mawar Cinta untuk Pacar">
+          <span class="tool-num">5</span>
+          <span class="tool-icon">🌹</span>
+        </div>
+      </div>
+
+      <!-- NPC Dialogue Pop-up -->
+      <div id="npc-dialogue-box">
+        <div class="dialogue-header">
+          <div class="dialogue-avatar" id="dialogue-avatar">👨‍🌾</div>
+          <div>
+            <div class="dialogue-name" id="dialogue-name">Pak Joko</div>
+            <div class="dialogue-role" id="dialogue-role">Tengkulak & Petani Senior</div>
+          </div>
+        </div>
+        <div class="dialogue-text" id="dialogue-text">"Halo anak muda! Senang melihat kalian berdua rukun merawat kebun ini."</div>
+        <div class="dialogue-actions" id="dialogue-actions">
+          <button class="btn-dialogue btn-dialogue-secondary" onclick="closeDialogue()">Tutup</button>
+          <button class="btn-dialogue btn-dialogue-primary" id="dialogue-primary-btn">Buka Toko</button>
+        </div>
+      </div>
+
       <!-- Action Prompt (e.g. Tekan [E] atau tap untuk berinteraksi) -->
       <div id="interaction-prompt">Tekan [E] atau Sentuh untuk Interaksi</div>
 
